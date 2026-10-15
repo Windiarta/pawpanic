@@ -317,7 +317,14 @@ export function createRoom() {
     setLobbyStatus('⚠️ Network library not loaded. Check internet connection or start server.', '#FEE2E2');
     return;
   }
-  if (peer) peer.destroy();
+  if (peer && !peer.destroyed) {
+    try { peer.destroy(); } catch (e) {}
+    peer = null;
+  }
+  if (conn) {
+    try { conn.close(); } catch (e) {}
+    conn = null;
+  }
 
   roomCode = generateShortCode();
   const fullPeerId = 'picopark-id-' + roomCode.toLowerCase();
@@ -335,20 +342,30 @@ export function createRoom() {
   ];
 
   peer = new window.Peer(fullPeerId, {
-    debug: 1,
+    debug: 2,
     config: { iceServers }
   });
 
-  peer.on('open', () => {
+  peer.on('open', (id) => {
+    console.log('[PeerJS] Host registered with peer ID:', id);
     netMode = 'host';
     updateHeaderBadge();
     setLobbyStatus(`✅ Room <b>${roomCode}</b> ready! Share this code with your friend. Waiting for Player 2...`, '#DCFCE7');
   });
 
   peer.on('connection', (incomingConn) => {
+    console.log('[PeerJS] Incoming connection from peer:', incomingConn.peer);
     conn = incomingConn;
     setupPeerHandlers();
-    conn.on('open', () => {
+
+    if (conn.open) {
+      handleConnected();
+    } else {
+      conn.on('open', handleConnected);
+    }
+
+    function handleConnected() {
+      console.log('[PeerJS] P2P DataChannel open as Host!');
       isSocketPaired = true;
       updateHeaderBadge();
       playSFX('unlock');
@@ -357,11 +374,17 @@ export function createRoom() {
       if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
 
       if (onStartGameCallback) onStartGameCallback('host');
-    });
+    }
   });
 
   peer.on('error', (err) => {
-    setLobbyStatus(`⚠️ Failed to create room (${err.type}). Try clicking Create Room Code again.`, '#FEE2E2');
+    console.error('[PeerJS] Host error:', err);
+    if (err.type === 'unavailable-id') {
+      setLobbyStatus(`⚠️ Room code <b>${roomCode}</b> is taken or active. Generating new room...`, '#FEF3C7');
+      setTimeout(createRoom, 800);
+      return;
+    }
+    setLobbyStatus(`⚠️ Failed to create room (${err.type || err}). Try again.`, '#FEE2E2');
   });
 }
 
@@ -399,7 +422,14 @@ export function joinRoom(rawCode) {
     return;
   }
 
-  if (peer) peer.destroy();
+  if (peer && !peer.destroyed) {
+    try { peer.destroy(); } catch (e) {}
+    peer = null;
+  }
+  if (conn) {
+    try { conn.close(); } catch (e) {}
+    conn = null;
+  }
   roomCode = rawCode;
   setLobbyStatus(`⏳ Connecting to Room <b>${roomCode}</b> (WebRTC)...`, '#FEF3C7');
 
@@ -413,20 +443,45 @@ export function joinRoom(rawCode) {
   ];
 
   peer = new window.Peer({
-    debug: 1,
+    debug: 2,
     config: { iceServers }
   });
 
-  peer.on('open', () => {
+  peer.on('open', (myId) => {
+    console.log('[PeerJS] Client peer opened with ID:', myId);
     netMode = 'client';
     updateHeaderBadge();
     const targetPeerId = 'picopark-id-' + roomCode.toLowerCase();
+    console.log('[PeerJS] Connecting to target peer ID:', targetPeerId);
     conn = peer.connect(targetPeerId, { reliable: true });
     setupPeerHandlers();
+
+    if (conn.open) {
+      handleClientConnected();
+    } else {
+      conn.on('open', handleClientConnected);
+    }
+
+    function handleClientConnected() {
+      console.log('[PeerJS] P2P DataChannel open as Client!');
+      isSocketPaired = true;
+      updateHeaderBadge();
+      playSFX('unlock');
+      setLobbyStatus(`🎉 Successfully connected to Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
+      const modal = document.getElementById('lobbyModal');
+      if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
+
+      if (onStartGameCallback) onStartGameCallback('client');
+    }
   });
 
   peer.on('error', (err) => {
-    setLobbyStatus(`⚠️ Room <b>${roomCode}</b> not found (${err.type}). Ensure code is correct!`, '#FEE2E2');
+    console.error('[PeerJS] Client error:', err);
+    if (err.type === 'peer-unavailable') {
+      setLobbyStatus(`⚠️ Room <b>${roomCode}</b> not found! Make sure Player 1 is waiting on screen.`, '#FEE2E2');
+    } else {
+      setLobbyStatus(`⚠️ Connection error (${err.type || err}). Check code and try again.`, '#FEE2E2');
+    }
   });
 }
 

@@ -1,19 +1,21 @@
-import { io } from 'socket.io-client';
+import mqtt from 'mqtt';
 import { playSFX } from './audio.js';
 
 let netMode = 'local'; // 'local' | 'host' | 'client'
-let peer = null;
-let conn = null;
-let socket = null;
 let isSocketPaired = false;
 let roomCode = '';
 let pingMs = 0;
 let lastPingSent = 0;
 
+let mqttClient = null;
+let currentPubTopic = '';
+let currentSubTopic = '';
+
 let onDataCallback = null;
 let onStartGameCallback = null;
 
-const SESSION_KEY = 'picopark_session';
+const SESSION_KEY = 'pawpanic_session';
+const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
 
 export function getSavedSession() {
   try {
@@ -44,17 +46,20 @@ export function generateToken() {
 
 export function leaveRoom() {
   clearSession();
-  if (socket && socket.connected) {
-    socket.emit('leave-room');
+  if (mqttClient) {
+    try {
+      if (currentPubTopic) {
+        mqttClient.publish(currentPubTopic, JSON.stringify({ type: 'leave' }));
+      }
+      mqttClient.end(true);
+    } catch (e) {}
+    mqttClient = null;
   }
-  if (peer) {
-    try { peer.destroy(); } catch (e) {}
-    peer = null;
-  }
-  conn = null;
   netMode = 'local';
   isSocketPaired = false;
   roomCode = '';
+  currentPubTopic = '';
+  currentSubTopic = '';
   updateHeaderBadge();
   setLobbyStatus('Mode lokal aktif. Kamu telah keluar dari room.', '#F1F5F9');
 }
@@ -79,17 +84,15 @@ export function getRoomCode() {
 }
 
 export function isNetworkConnected() {
-  if (socket && socket.connected) {
-    return isSocketPaired;
-  }
-  return !!(conn && conn.open);
+  return isSocketPaired && !!mqttClient && mqttClient.connected;
 }
 
 export function networkSend(data) {
-  if (socket && socket.connected) {
-    socket.emit('game-msg', data);
-  } else if (conn && conn.open) {
-    conn.send(data);
+  if (!mqttClient || !mqttClient.connected || !currentPubTopic) return;
+  try {
+    mqttClient.publish(currentPubTopic, JSON.stringify(data));
+  } catch (e) {
+    console.error('[MQTT] Send error:', e);
   }
 }
 
@@ -155,112 +158,7 @@ export function initNetwork(handlers) {
   onDataCallback = handlers.onData;
   onStartGameCallback = handlers.onStartGame;
 
-  const isLocalhost = Boolean(
-    typeof window !== 'undefined' && (
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.startsWith('192.168.') ||
-      window.location.hostname.startsWith('10.')
-    )
-  );
-
-  const defaultRemoteServer = ''; // Nonaktif jika tidak ada backend khusus
-  const customServer = (typeof window !== 'undefined' && (window.__SOCKET_SERVER__ || localStorage.getItem('pawpanic_server_url')));
-
-  const serverOrigin = customServer || (isLocalhost ? window.location.origin : '');
-
-  if (serverOrigin) {
-    try {
-      socket = io(serverOrigin, {
-        transports: ['websocket', 'polling'],
-        reconnectionAttempts: 5,
-        timeout: 5000
-      });
-
-    socket.on('connect', () => {
-      setLobbyStatus('⚡ Terhubung ke Game Server (Socket.IO siap). Buat room atau gabung kode!', '#EFF6FF');
-
-      // Auto-reconnect with saved session if present
-      const saved = getSavedSession();
-      if (saved && saved.code && saved.token && saved.role) {
-        setLobbyStatus(`⏳ Memulihkan sesi Room <b>${saved.code}</b>...`, '#FEF3C7');
-        socket.emit('reconnect-room', { code: saved.code, token: saved.token, role: saved.role }, (res) => {
-          if (res && res.ok) {
-            roomCode = res.code;
-            netMode = res.role === 'host' ? 'host' : 'client';
-            isSocketPaired = true;
-            updateHeaderBadge();
-            playSFX('unlock');
-            setLobbyStatus(`⚡ Reconnected to Room <b>${roomCode}</b>!`, '#DCFCE7');
-            const modal = document.getElementById('lobbyModal');
-            if (modal) modal.classList.add('hidden');
-            if (onStartGameCallback) onStartGameCallback(netMode);
-          } else {
-            clearSession();
-            netMode = 'local';
-            isSocketPaired = false;
-            updateHeaderBadge();
-            setLobbyStatus('Previous room session expired. Please create a new room.', '#F1F5F9');
-          }
-        });
-      }
-    });
-
-    socket.on('player-joined', () => {
-      if (netMode === 'host') {
-        isSocketPaired = true;
-        updateHeaderBadge();
-        playSFX('unlock');
-        setLobbyStatus(`🎉 Player 2 joined Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
-        const modal = document.getElementById('lobbyModal');
-        if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
-        if (onStartGameCallback) onStartGameCallback('host');
-      }
-    });
-
-    socket.on('game-ready', () => {
-      if (netMode === 'client') {
-        isSocketPaired = true;
-        updateHeaderBadge();
-        playSFX('unlock');
-        setLobbyStatus(`🎉 Successfully connected to Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
-        const modal = document.getElementById('lobbyModal');
-        if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
-        if (onStartGameCallback) onStartGameCallback('client');
-      }
-    });
-
-    socket.on('peer-reconnected', () => {
-      isSocketPaired = true;
-      updateHeaderBadge();
-      setLobbyStatus(`🎉 Friend reconnected to Room <b>${roomCode}</b>!`, '#DCFCE7');
-    });
-
-    socket.on('peer-reconnecting', () => {
-      isSocketPaired = false;
-      updateHeaderBadge();
-      setLobbyStatus(`⏳ Friend disconnected, waiting for reconnection...`, '#FEF3C7');
-    });
-
-    socket.on('game-msg', (data) => {
-      handleIncomingPacket(data);
-    });
-
-    socket.on('peer-disconnected', (data) => {
-      clearSession();
-      setLobbyStatus(`⚠️ ${(data && data.reason) || 'Friend disconnected'}. Returned to Local Mode.`, '#FEE2E2');
-      netMode = 'local';
-      isSocketPaired = false;
-      updateHeaderBadge();
-    });
-  } catch (e) {
-    socket = null;
-  }
-} else {
-  socket = null;
-}
-
-  // Ping interval
+  // Heartbeat / ping interval
   setInterval(() => {
     if (isNetworkConnected()) {
       lastPingSent = performance.now();
@@ -281,6 +179,14 @@ function handleIncomingPacket(data) {
     updateHeaderBadge();
     return;
   }
+  if (data.type === 'leave') {
+    clearSession();
+    setLobbyStatus('⚠️ Friend left the room. Returned to Local Mode.', '#FEE2E2');
+    netMode = 'local';
+    isSocketPaired = false;
+    updateHeaderBadge();
+    return;
+  }
   if (data.type === 'input' && netMode === 'host') {
     remoteInput.left = !!data.left;
     remoteInput.right = !!data.right;
@@ -293,98 +199,77 @@ function handleIncomingPacket(data) {
 }
 
 export function createRoom() {
-  const token = generateToken();
-  if (socket && socket.connected) {
-    socket.emit('create-room', { token }, (res) => {
-      if (res && res.ok) {
-        roomCode = res.code;
-        netMode = 'host';
-        isSocketPaired = false;
-        saveSession({ code: res.code, role: 'host', token: res.token || token });
-        const hostDisplay = document.getElementById('hostCodeDisplay');
-        if (hostDisplay) hostDisplay.textContent = roomCode;
-        updateHeaderBadge();
-        setLobbyStatus(`✅ Room <b>${roomCode}</b> is active on server! Share this code with your friend. Waiting for Player 2...`, '#DCFCE7');
-      } else {
-        setLobbyStatus('⚠️ Failed to create room on server.', '#FEE2E2');
-      }
-    });
-    return;
-  }
-
-  // Fallback: PeerJS
-  if (typeof window.Peer === 'undefined') {
-    setLobbyStatus('⚠️ Network library not loaded. Check internet connection or start server.', '#FEE2E2');
-    return;
-  }
-  if (peer && !peer.destroyed) {
-    try { peer.destroy(); } catch (e) {}
-    peer = null;
-  }
-  if (conn) {
-    try { conn.close(); } catch (e) {}
-    conn = null;
+  if (mqttClient) {
+    try { mqttClient.end(true); } catch (e) {}
+    mqttClient = null;
   }
 
   roomCode = generateShortCode();
-  const fullPeerId = 'picopark-id-' + roomCode.toLowerCase();
   const hostDisplay = document.getElementById('hostCodeDisplay');
   if (hostDisplay) hostDisplay.textContent = roomCode;
-  setLobbyStatus(`⏳ Setting up room <b>${roomCode}</b> (WebRTC)...`, '#FEF3C7');
+  setLobbyStatus(`⏳ Creating room <b>${roomCode}</b> on cloud relay...`, '#FEF3C7');
 
-  const iceServers = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' }
-  ];
+  currentPubTopic = `pawpanic/rooms/${roomCode}/host_to_guest`;
+  currentSubTopic = `pawpanic/rooms/${roomCode}/guest_to_host`;
 
-  peer = new window.Peer(fullPeerId, {
-    debug: 2,
-    config: { iceServers }
+  const clientId = 'pawpanic-host-' + Math.random().toString(36).slice(2, 10);
+  mqttClient = mqtt.connect(MQTT_BROKER, {
+    clientId,
+    keepalive: 30,
+    reconnectPeriod: 2000,
+    clean: true
   });
 
-  peer.on('open', (id) => {
-    console.log('[PeerJS] Host registered with peer ID:', id);
-    netMode = 'host';
-    updateHeaderBadge();
-    setLobbyStatus(`✅ Room <b>${roomCode}</b> ready! Share this code with your friend. Waiting for Player 2...`, '#DCFCE7');
-  });
-
-  peer.on('connection', (incomingConn) => {
-    console.log('[PeerJS] Incoming connection from peer:', incomingConn.peer);
-    conn = incomingConn;
-    setupPeerHandlers();
-
-    if (conn.open) {
-      handleConnected();
-    } else {
-      conn.on('open', handleConnected);
-    }
-
-    function handleConnected() {
-      console.log('[PeerJS] P2P DataChannel open as Host!');
-      isSocketPaired = true;
+  mqttClient.on('connect', () => {
+    console.log('[MQTT Host] Connected to broker');
+    mqttClient.subscribe(currentSubTopic, (err) => {
+      if (err) {
+        setLobbyStatus(`⚠️ Failed to subscribe room: ${err.message}`, '#FEE2E2');
+        return;
+      }
+      netMode = 'host';
+      isSocketPaired = false;
       updateHeaderBadge();
-      playSFX('unlock');
-      setLobbyStatus(`🎉 Player 2 joined Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
-      const modal = document.getElementById('lobbyModal');
-      if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
+      setLobbyStatus(`✅ Room <b>${roomCode}</b> ready! Share this code with your friend. Waiting for Player 2...`, '#DCFCE7');
+    });
+  });
 
-      if (onStartGameCallback) onStartGameCallback('host');
+  mqttClient.on('message', (topic, payload) => {
+    try {
+      const data = JSON.parse(payload.toString());
+
+      if (data.type === 'join-request') {
+        console.log('[MQTT Host] Guest requested to join');
+        isSocketPaired = true;
+        updateHeaderBadge();
+        playSFX('unlock');
+        setLobbyStatus(`🎉 Player 2 joined Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
+
+        // Acknowledge guest
+        networkSend({ type: 'join-ack', roomCode });
+
+        const modal = document.getElementById('lobbyModal');
+        if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
+
+        if (onStartGameCallback) onStartGameCallback('host');
+        return;
+      }
+
+      handleIncomingPacket(data);
+    } catch (e) {
+      console.error('[MQTT Host] Parse error:', e);
     }
   });
 
-  peer.on('error', (err) => {
-    console.error('[PeerJS] Host error:', err);
-    if (err.type === 'unavailable-id') {
-      setLobbyStatus(`⚠️ Room code <b>${roomCode}</b> is taken or active. Generating new room...`, '#FEF3C7');
-      setTimeout(createRoom, 800);
-      return;
+  mqttClient.on('error', (err) => {
+    console.error('[MQTT Host] Error:', err);
+    setLobbyStatus(`⚠️ Cloud relay error (${err.message || err}).`, '#FEE2E2');
+  });
+
+  mqttClient.on('close', () => {
+    if (netMode === 'host' && isSocketPaired) {
+      setLobbyStatus('⚠️ Connection to cloud relay closed.', '#FEE2E2');
     }
-    setLobbyStatus(`⚠️ Failed to create room (${err.type || err}). Try again.`, '#FEE2E2');
   });
 }
 
@@ -393,126 +278,98 @@ export function joinRoom(rawCode) {
     setLobbyStatus('⚠️ Please enter the 4-character room code from Player 1!', '#FEE2E2');
     return;
   }
-  const token = generateToken();
 
-  if (socket && socket.connected) {
-    setLobbyStatus(`⏳ Connecting to Room <b>${rawCode}</b> on server...`, '#FEF3C7');
-    socket.emit('join-room', { code: rawCode, token }, (res) => {
-      if (res && res.ok) {
-        roomCode = res.code;
-        netMode = 'client';
-        isSocketPaired = true;
-        saveSession({ code: res.code, role: 'guest', token: res.token || token });
-        updateHeaderBadge();
-        playSFX('unlock');
-        setLobbyStatus(`🎉 Successfully connected to Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
-        const modal = document.getElementById('lobbyModal');
-        if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
-        if (onStartGameCallback) onStartGameCallback('client');
-      } else {
-        setLobbyStatus(`⚠️ ${(res && res.error) || 'Failed to connect to room'}`, '#FEE2E2');
+  if (mqttClient) {
+    try { mqttClient.end(true); } catch (e) {}
+    mqttClient = null;
+  }
+
+  roomCode = rawCode.trim().toUpperCase();
+  setLobbyStatus(`⏳ Connecting to Room <b>${roomCode}</b> on cloud relay...`, '#FEF3C7');
+
+  currentPubTopic = `pawpanic/rooms/${roomCode}/guest_to_host`;
+  currentSubTopic = `pawpanic/rooms/${roomCode}/host_to_guest`;
+
+  const clientId = 'pawpanic-guest-' + Math.random().toString(36).slice(2, 10);
+  mqttClient = mqtt.connect(MQTT_BROKER, {
+    clientId,
+    keepalive: 30,
+    reconnectPeriod: 2000,
+    clean: true
+  });
+
+  let ackReceived = false;
+
+  mqttClient.on('connect', () => {
+    console.log('[MQTT Guest] Connected to broker');
+    mqttClient.subscribe(currentSubTopic, (err) => {
+      if (err) {
+        setLobbyStatus(`⚠️ Failed to join room topic: ${err.message}`, '#FEE2E2');
+        return;
       }
-    });
-    return;
-  }
-
-  // Fallback: PeerJS
-  if (typeof window.Peer === 'undefined') {
-    setLobbyStatus('⚠️ Network library not loaded. Check internet connection or start server.', '#FEE2E2');
-    return;
-  }
-
-  if (peer && !peer.destroyed) {
-    try { peer.destroy(); } catch (e) {}
-    peer = null;
-  }
-  if (conn) {
-    try { conn.close(); } catch (e) {}
-    conn = null;
-  }
-  roomCode = rawCode;
-  setLobbyStatus(`⏳ Connecting to Room <b>${roomCode}</b> (WebRTC)...`, '#FEF3C7');
-
-  const iceServers = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' }
-  ];
-
-  peer = new window.Peer({
-    debug: 2,
-    config: { iceServers }
-  });
-
-  peer.on('open', (myId) => {
-    console.log('[PeerJS] Client peer opened with ID:', myId);
-    netMode = 'client';
-    updateHeaderBadge();
-    const targetPeerId = 'picopark-id-' + roomCode.toLowerCase();
-    console.log('[PeerJS] Connecting to target peer ID:', targetPeerId);
-    conn = peer.connect(targetPeerId, { reliable: true });
-    setupPeerHandlers();
-
-    if (conn.open) {
-      handleClientConnected();
-    } else {
-      conn.on('open', handleClientConnected);
-    }
-
-    function handleClientConnected() {
-      console.log('[PeerJS] P2P DataChannel open as Client!');
-      isSocketPaired = true;
+      netMode = 'client';
       updateHeaderBadge();
-      playSFX('unlock');
-      setLobbyStatus(`🎉 Successfully connected to Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
-      const modal = document.getElementById('lobbyModal');
-      if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
 
-      if (onStartGameCallback) onStartGameCallback('client');
+      // Send join request periodically until acked
+      const sendJoin = () => {
+        if (!ackReceived && mqttClient && mqttClient.connected) {
+          networkSend({ type: 'join-request' });
+        }
+      };
+
+      sendJoin();
+      const joinInterval = setInterval(() => {
+        if (ackReceived) {
+          clearInterval(joinInterval);
+        } else {
+          sendJoin();
+        }
+      }, 800);
+
+      setTimeout(() => {
+        clearInterval(joinInterval);
+        if (!ackReceived) {
+          setLobbyStatus(`⚠️ Room <b>${roomCode}</b> not responding. Check if Player 1 is waiting on screen!`, '#FEE2E2');
+        }
+      }, 10000);
+    });
+  });
+
+  mqttClient.on('message', (topic, payload) => {
+    try {
+      const data = JSON.parse(payload.toString());
+
+      if (data.type === 'join-ack') {
+        if (!ackReceived) {
+          ackReceived = true;
+          console.log('[MQTT Guest] Join acknowledged by Host!');
+          isSocketPaired = true;
+          updateHeaderBadge();
+          playSFX('unlock');
+          setLobbyStatus(`🎉 Successfully connected to Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
+
+          const modal = document.getElementById('lobbyModal');
+          if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
+
+          if (onStartGameCallback) onStartGameCallback('client');
+        }
+        return;
+      }
+
+      handleIncomingPacket(data);
+    } catch (e) {
+      console.error('[MQTT Guest] Parse error:', e);
     }
   });
 
-  peer.on('error', (err) => {
-    console.error('[PeerJS] Client error:', err);
-    if (err.type === 'peer-unavailable') {
-      setLobbyStatus(`⚠️ Room <b>${roomCode}</b> not found! Make sure Player 1 is waiting on screen.`, '#FEE2E2');
-    } else {
-      setLobbyStatus(`⚠️ Connection error (${err.type || err}). Check code and try again.`, '#FEE2E2');
+  mqttClient.on('error', (err) => {
+    console.error('[MQTT Guest] Error:', err);
+    setLobbyStatus(`⚠️ Connection error (${err.message || err}).`, '#FEE2E2');
+  });
+
+  mqttClient.on('close', () => {
+    if (netMode === 'client' && isSocketPaired) {
+      setLobbyStatus('⚠️ Connection to cloud relay closed.', '#FEE2E2');
     }
-  });
-}
-
-function setupPeerHandlers() {
-  if (!conn) return;
-
-  conn.on('open', () => {
-    isSocketPaired = true;
-    updateHeaderBadge();
-    playSFX('unlock');
-    setLobbyStatus(`🎉 Successfully connected to Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
-    const modal = document.getElementById('lobbyModal');
-    if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
-
-    if (onStartGameCallback) onStartGameCallback(netMode);
-  });
-
-  conn.on('data', (data) => {
-    handleIncomingPacket(data);
-  });
-
-  conn.on('close', () => {
-    setLobbyStatus('⚠️ Connection lost. Returned to Local Mode.', '#FEE2E2');
-    netMode = 'local';
-    isSocketPaired = false;
-    conn = null;
-    updateHeaderBadge();
-  });
-
-  conn.on('error', (err) => {
-    console.error('Peer connection error:', err);
-    setLobbyStatus(`⚠️ P2P connection error: ${err.message || err.type || err}`, '#FEE2E2');
   });
 }

@@ -348,6 +348,16 @@ export function createRoom() {
   peer.on('connection', (incomingConn) => {
     conn = incomingConn;
     setupPeerHandlers();
+    conn.on('open', () => {
+      isSocketPaired = true;
+      updateHeaderBadge();
+      playSFX('unlock');
+      setLobbyStatus(`🎉 Player 2 joined Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
+      const modal = document.getElementById('lobbyModal');
+      if (modal) setTimeout(() => modal.classList.add('hidden'), 650);
+
+      if (onStartGameCallback) onStartGameCallback('host');
+    });
   });
 
   peer.on('error', (err) => {
@@ -421,7 +431,10 @@ export function joinRoom(rawCode) {
 }
 
 function setupPeerHandlers() {
+  if (!conn) return;
+
   conn.on('open', () => {
+    isSocketPaired = true;
     updateHeaderBadge();
     playSFX('unlock');
     setLobbyStatus(`🎉 Successfully connected to Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
@@ -438,7 +451,13 @@ function setupPeerHandlers() {
   conn.on('close', () => {
     setLobbyStatus('⚠️ Connection lost. Returned to Local Mode.', '#FEE2E2');
     netMode = 'local';
+    isSocketPaired = false;
     conn = null;
     updateHeaderBadge();
+  });
+
+  conn.on('error', (err) => {
+    console.error('Peer connection error:', err);
+    setLobbyStatus(`⚠️ P2P connection error: ${err.message || err.type || err}`, '#FEE2E2');
   });
 }

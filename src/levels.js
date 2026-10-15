@@ -238,14 +238,16 @@ function generate100Levels() {
         door = { x: 840, y: 396 };
 
       } else if (archetype === 2) {
-        // Twin Towers: Symmetrical stepping towers with key in center
-        subtitle = 'Climb the towers together! Grab the floating key in the middle!';
+        // Twin Towers: Symmetrical stepping towers with center stepping bridge
+        subtitle = 'Climb the towers together! Grab the key on the center bridge!';
         const tower1X = 200 + v * 15;
         const tower2X = 640 - v * 15;
         const towerH = 80 + v * 8;
+        const midX = (tower1X + 100 + tower2X) / 2 - 60;
         walls.push({ x: tower1X, y: FLOOR_Y - towerH, w: 100, h: towerH });
         walls.push({ x: tower2X, y: FLOOR_Y - towerH, w: 100, h: towerH });
-        key = { x: (tower1X + tower2X + 100) / 2, y: FLOOR_Y - towerH - 45 };
+        walls.push({ x: midX, y: FLOOR_Y - towerH + 20, w: 120, h: 22 });
+        key = { x: midX + 60, y: FLOOR_Y - towerH - 30 };
         door = { x: 840, y: 396 };
 
       } else {

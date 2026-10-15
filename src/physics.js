@@ -53,50 +53,44 @@ export function updatePhysicsEngine({
   const { players, walls, blocks, buttons, movers, tetherConfig, keyItem, door } = state;
 
   if (netMode === 'client') {
-    // 1. Smooth LERP interpolation for networked entities
-    players.forEach((p, idx) => {
+    // 1. Smooth LERP interpolation from host state (no rubberbanding)
+    players.forEach((p) => {
       if (typeof p.targetX === 'number') {
-        const factor = idx === 1 ? 0.35 : 0.48;
+        const dist = Math.hypot(p.targetX - p.x, p.targetY - p.y);
+        const factor = dist > 40 ? 0.75 : 0.55;
         p.x += (p.targetX - p.x) * factor;
         p.y += (p.targetY - p.y) * factor;
       }
     });
     blocks.forEach(b => {
       if (typeof b.targetX === 'number') {
-        b.x += (b.targetX - b.x) * 0.45;
-        b.y += (b.targetY - b.y) * 0.45;
+        b.x += (b.targetX - b.x) * 0.55;
+        b.y += (b.targetY - b.y) * 0.55;
       }
     });
     movers.forEach(m => {
       if (typeof m.targetX === 'number') {
-        m.x += (m.targetX - m.x) * 0.45;
-        m.y += (m.targetY - m.y) * 0.45;
+        m.x += (m.targetX - m.x) * 0.55;
+        m.y += (m.targetY - m.y) * 0.55;
       }
     });
     if (keyItem && typeof keyItem.targetX === 'number') {
-      keyItem.x += (keyItem.targetX - keyItem.x) * 0.35;
-      keyItem.y += (keyItem.targetY - keyItem.y) * 0.35;
+      keyItem.x += (keyItem.targetX - keyItem.x) * 0.5;
+      keyItem.y += (keyItem.targetY - keyItem.y) * 0.5;
     }
 
-    // 2. Client-side local prediction for Player 2 (0ms input latency)
+    // 2. Responsive visual animation for Player 2 without modifying coordinates
     const inp = inputs[1];
     const p2 = players[1];
     if (p2 && !p2.inDoor) {
       if (inp.left && !inp.right) {
         p2.facing = -1;
-        p2.walkFrame += 0.22;
-        p2.x -= MOVE_SPEED * 0.35;
+        p2.walkFrame += 0.25;
       } else if (inp.right && !inp.left) {
         p2.facing = 1;
-        p2.walkFrame += 0.22;
-        p2.x += MOVE_SPEED * 0.35;
+        p2.walkFrame += 0.25;
       } else {
         p2.walkFrame = 0;
-      }
-      if (inp.jumpPressed) {
-        p2.vy = JUMP_FORCE;
-        spawnDust(p2.x + p2.w / 2, p2.y + p2.h, 6);
-        playSFX('jump');
       }
     }
     return;

@@ -1135,11 +1135,14 @@ function applyHostState(s) {
     if (!state.players[i]) return;
     state.players[i].targetX = sp.x;
     state.players[i].targetY = sp.y;
-    state.players[i].facing = sp.f;
-    state.players[i].walkFrame = sp.wf;
+    // Don't overwrite local responsive facing/walkFrame on client's own avatar (player 2)
+    if (i !== 1) {
+      state.players[i].facing = sp.f;
+      state.players[i].walkFrame = sp.wf;
+    }
     state.players[i].sweating = sp.sw;
     state.players[i].inDoor = sp.inD;
-    if (Math.hypot(state.players[i].x - sp.x, state.players[i].y - sp.y) > 85) {
+    if (Math.hypot(state.players[i].x - sp.x, state.players[i].y - sp.y) > 60) {
       state.players[i].x = sp.x;
       state.players[i].y = sp.y;
     }
@@ -1498,10 +1501,7 @@ function gameLoop() {
       updateParticles();
 
       if (getNetMode() === 'host') {
-        state.hostStateTick++;
-        if (state.hostStateTick % 2 === 0) {
-          sendHostState();
-        }
+        sendHostState();
       }
 
       updateTimer();

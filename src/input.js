@@ -105,7 +105,7 @@ export function getPlayerInputs(netMode, remoteInput, sendNetworkInput, isConnec
                        myInput.jump !== lastSentInput.jump ||
                        myInput.jumpPressed;
 
-    if (isConnected() && (hasChanged || (now - lastInputSentTime > 45))) {
+    if (isConnected() && (hasChanged || (now - lastInputSentTime > 16))) {
       sendNetworkInput(myInput);
       lastSentInput.left = myInput.left;
       lastSentInput.right = myInput.right;

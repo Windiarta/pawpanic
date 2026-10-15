@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Gradients matching the PAW PANIC! palette -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFDF7" />
+      <stop offset="100%" stop-color="#FFE8D6" />
+    </linearGradient>
+
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF6B9D" />
+      <stop offset="100%" stop-color="#FF8E53" />
+    </linearGradient>
+
+    <linearGradient id="pinkCat" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF9EBB" />
+      <stop offset="100%" stop-color="#FF759F" />
+    </linearGradient>
+
+    <linearGradient id="mintCat" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#A8F5D2" />
+      <stop offset="100%" stop-color="#6EE2B3" />
+    </linearGradient>
+
+    <linearGradient id="goldKey" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFE94D" />
+      <stop offset="100%" stop-color="#FFB300" />
+    </linearGradient>
+
+    <!-- Soft drop shadow for overall icon -->
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#4A193B" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- App Icon / Favicon Base (Rounded Square) -->
+  <rect x="24" y="24" width="464" height="464" rx="112" fill="url(#bgGrad)" stroke="#4A193B" stroke-width="24" />
+  <rect x="44" y="44" width="424" height="424" rx="94" fill="none" stroke="url(#borderGrad)" stroke-width="12" opacity="0.35" />
+
+  <!-- Decorative Panic / Sparkle Lines -->
+  <g stroke-linecap="round" stroke-width="14">
+    <line x1="88" y1="115" x2="65" y2="92" stroke="#FF6B9D" />
+    <line x1="68" y1="152" x2="48" y2="148" stroke="#FFB300" />
+    <line x1="424" y1="115" x2="447" y2="92" stroke="#5CE1E6" />
+    <line x1="444" y1="152" x2="464" y2="148" stroke="#FF8E53" />
+  </g>
+
+  <!-- Ground Shadow -->
+  <ellipse cx="256" cy="442" rx="150" ry="20" fill="#4A193B" opacity="0.15" />
+
+  <!-- ================= BOTTOM CAT (MINT GREEN BLOCKY CAT) ================= -->
+  <g id="bottom-cat">
+    <!-- Left & Right Feet -->
+    <rect x="165" y="405" width="36" height="34" rx="16" fill="#6EE2B3" stroke="#4A193B" stroke-width="18" />
+    <rect x="311" y="405" width="36" height="34" rx="16" fill="#6EE2B3" stroke="#4A193B" stroke-width="18" />
+
+    <!-- Tail -->
+    <path d="M 140 385 Q 92 380 100 340" fill="none" stroke="#4A193B" stroke-width="28" stroke-linecap="round" />
+    <path d="M 140 385 Q 92 380 100 340" fill="none" stroke="#6EE2B3" stroke-width="12" stroke-linecap="round" />
+
+    <!-- Main Cube Body with Ears -->
+    <path d="M 136 275
+             L 136 228 Q 136 212 152 224 L 186 250
+             L 326 250
+             L 360 224 Q 376 212 376 228 L 376 275
+             L 376 392 Q 376 420 348 420
+             L 164 420 Q 136 420 136 392 Z"
+          fill="url(#mintCat)" stroke="#4A193B" stroke-width="18" stroke-linejoin="round" />
+
+    <!-- 3D Side Shading (Pico Park style cube feel) -->
+    <path d="M 150 265 L 200 265 L 200 408 L 164 408 Q 148 408 148 392 Z" fill="#FFFFFF" opacity="0.3" />
+
+    <!-- Cute Panic / Effort Face (> w <) -->
+    <!-- Left Eye '>' -->
+    <path d="M 188 320 L 210 334 L 188 348" fill="none" stroke="#4A193B" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- Right Eye '<' -->
+    <path d="M 324 320 L 302 334 L 324 348" fill="none" stroke="#4A193B" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- Blush Cheeks -->
+    <ellipse cx="174" cy="358" rx="14" ry="8" fill="#FF6B9D" opacity="0.65" />
+    <ellipse cx="338" cy="358" rx="14" ry="8" fill="#FF6B9D" opacity="0.65" />
+    <!-- Open Panic/Cat Mouth -->
+    <path d="M 236 344 Q 246 336 256 346 Q 266 336 276 344 Q 278 376 256 376 Q 234 376 236 344 Z" fill="#FF6B9D" stroke="#4A193B" stroke-width="12" stroke-linejoin="round" />
+
+    <!-- Raised Paws Holding the Top Cat / Key -->
+    <rect x="130" y="248" width="34" height="48" rx="17" transform="rotate(-20 147 272)" fill="#A8F5D2" stroke="#4A193B" stroke-width="16" />
+    <rect x="348" y="248" width="34" height="48" rx="17" transform="rotate(20 365 272)" fill="#A8F5D2" stroke="#4A193B" stroke-width="16" />
+  </g>
+
+  <!-- ================= GOLDEN PICO PARK KEY (MIDDLE) ================= -->
+  <g id="golden-key" filter="url(#dropShadow)" transform="rotate(-5 256 235)">
+    <!-- Key Teeth -->
+    <path d="M 102 225 L 102 278 L 138 278 L 138 242 L 156 242 L 156 278 L 190 278 L 190 225 Z"
+          fill="#FFB300" stroke="#4A193B" stroke-width="18" stroke-linejoin="round" />
+    <!-- Key Shaft -->
+    <rect x="82" y="198" width="240" height="42" rx="20" fill="url(#goldKey)" stroke="#4A193B" stroke-width="18" />
+    <!-- Key Bow (Round Head) -->
+    <circle cx="368" cy="219" r="72" fill="url(#goldKey)" stroke="#4A193B" stroke-width="18" />
+    <!-- Key Highlight -->
+    <path d="M 325 172 A 52 52 0 0 1 395 168" fill="none" stroke="#FFF9C4" stroke-width="12" stroke-linecap="round" />
+    <!-- Star Cutout inside Key Bow -->
+    <polygon points="368,179 380,203 406,207 387,225 392,251 368,239 344,251 349,225 330,207 356,203"
+             fill="#FFFDF7" stroke="#4A193B" stroke-width="14" stroke-linejoin="round" />
+  </g>
+
+  <!-- ================= TOP CAT (PINK BLOCKY CAT) ================= -->
+  <g id="top-cat">
+    <!-- Main Cube Body with Ears -->
+    <path d="M 162 125
+             L 162 78 Q 162 60 178 72 L 210 98
+             L 290 98
+             L 322 72 Q 338 60 338 78 L 338 125
+             L 338 202 Q 338 226 314 226
+             L 186 226 Q 162 226 162 202 Z"
+          fill="url(#pinkCat)" stroke="#4A193B" stroke-width="18" stroke-linejoin="round" />
+
+    <!-- Ear Inner Pink -->
+    <polygon points="175,88 175,112 198,105" fill="#FF477E" />
+    <polygon points="325,88 325,112 302,105" fill="#FF477E" />
+
+    <!-- Highlight on Top Cat -->
+    <path d="M 176 112 L 214 112 L 214 214 L 186 214 Q 176 214 176 202 Z" fill="#FFFFFF" opacity="0.28" />
+
+    <!-- Cute Dot Eyes -->
+    <circle cx="210" cy="162" r="12" fill="#4A193B" />
+    <circle cx="290" cy="162" r="12" fill="#4A193B" />
+    <circle cx="206" cy="158" r="4" fill="#FFFFFF" />
+    <circle cx="286" cy="158" r="4" fill="#FFFFFF" />
+
+    <!-- Cute Cat Mouth 'w' -->
+    <path d="M 234 172 Q 242 183 250 172 Q 258 183 266 172" fill="none" stroke="#4A193B" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- Sweat Drop (Panic Vibe) -->
+    <path d="M 358 102 Q 374 124 358 136 Q 342 124 358 102 Z" fill="#5CE1E6" stroke="#4A193B" stroke-width="10" stroke-linejoin="round" />
+
+    <!-- Little Paws Resting on the Key -->
+    <circle cx="195" cy="226" r="18" fill="#FF9EBB" stroke="#4A193B" stroke-width="15" />
+    <circle cx="295" cy="222" r="18" fill="#FF9EBB" stroke="#4A193B" stroke-width="15" />
+  </g>
+
+  <!-- ================= FLOATING PAW BADGE (TOP LEFT) ================= -->
+  <g id="paw-badge" transform="translate(96, 96) rotate(-18)">
+    <circle cx="0" cy="8" r="16" fill="#FF8E53" stroke="#4A193B" stroke-width="10" />
+    <circle cx="-18" cy="-14" r="9" fill="#FF8E53" stroke="#4A193B" stroke-width="8" />
+    <circle cx="0" cy="-22" r="9" fill="#FF8E53" stroke="#4A193B" stroke-width="8" />
+    <circle cx="18" cy="-14" r="9" fill="#FF8E53" stroke="#4A193B" stroke-width="8" />
+  </g>
+</svg>

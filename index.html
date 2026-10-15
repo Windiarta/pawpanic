@@ -1,0 +1,2788 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PAW PANIC! - 2 Player Co-Op Online</title>
+  <link rel="icon" type="image/svg+xml" href="pawpanic.svg" />
+  <link rel="alternate icon" href="pawpanic.svg" />
+  <!-- Socket.IO for Ultra-Fast & 100% Reliable Server-Relayed Multiplayer -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <!-- PeerJS Fallback for Standalone P2P WebRTC -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg-cream: #FFFDF7;
+      --wall-coral: #EE6C4D;
+      --wall-dark: #D1492B;
+      --p1-color: #FF7A29;
+      --p1-dark: #CC5200;
+      --p2-color: #2EC4B6;
+      --p2-dark: #1B8A7E;
+      --ink: #293241;
+      --card-bg: #FFFFFF;
+      --accent-yellow: #FFD166;
+      --accent-green: #06D6A0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Fredoka', 'Nunito', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-cream);
+      background-image: radial-gradient(#E8E2D5 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* TOP HEADER BAR */
+    header {
+      width: 100%;
+      max-width: 1024px;
+      padding: 10px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-logo {
+      background: var(--wall-coral);
+      color: #fff;
+      font-weight: 900;
+      font-size: 1.25rem;
+      letter-spacing: 1.5px;
+      padding: 6px 14px;
+      border-radius: 10px;
+      border: 3px solid var(--ink);
+      box-shadow: 0 4px 0 var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-badge {
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 2.5px solid var(--ink);
+      background: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 3px 0 rgba(41,50,65,0.15);
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #9CA3AF;
+    }
+    .status-dot.online { background: #10B981; box-shadow: 0 0 8px #10B981; }
+    .status-dot.waiting { background: #F59E0B; animation: pulse 1.2s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: inherit;
+      font-weight: 800;
+      font-size: 0.85rem;
+      padding: 7px 13px;
+      border-radius: 9px;
+      border: 2.5px solid var(--ink);
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      box-shadow: 0 3px 0 var(--ink);
+      transition: transform 0.08s, box-shadow 0.08s, background 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: #FFF3EB;
+    }
+
+    .btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 var(--ink);
+    }
+
+    .btn-primary {
+      background: var(--p1-color);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #FF670F;
+    }
+
+    .btn-secondary {
+      background: var(--p2-color);
+      color: #fff;
+    }
+    .btn-secondary:hover {
+      background: #25A99D;
+    }
+
+    .btn-yellow {
+      background: var(--accent-yellow);
+    }
+
+    select.level-select {
+      font-family: inherit;
+      font-weight: 800;
+      font-size: 0.85rem;
+      padding: 7px 10px;
+      border-radius: 9px;
+      border: 2.5px solid var(--ink);
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 3px 0 var(--ink);
+      cursor: pointer;
+    }
+
+    /* MAIN STAGE WRAPPER */
+    .game-wrapper {
+      position: relative;
+      width: calc(100vw - 24px);
+      max-width: min(1200px, calc((100vh - 150px) * 16 / 9));
+      aspect-ratio: 16 / 9;
+      background: var(--bg-cream);
+      border: 4px solid var(--ink);
+      border-radius: 16px;
+      box-shadow: 0 10px 0 var(--ink), 0 16px 32px rgba(0,0,0,0.12);
+      overflow: hidden;
+      margin: 4px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .game-wrapper:fullscreen,
+    .game-wrapper:-webkit-full-screen {
+      width: 100vw;
+      height: 100vh;
+      max-width: none;
+      max-height: none;
+      margin: 0;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      background: #111827;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      max-height: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* EMOTE & HUD BAR BELOW GAME */
+    .hud-footer {
+      width: 100%;
+      max-width: 960px;
+      padding: 8px 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .emote-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .emote-label {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: #555;
+      margin-right: 4px;
+    }
+
+    .controls-hint {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #4A5568;
+      background: rgba(255,255,255,0.85);
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 2px solid #CBD5E1;
+    }
+
+    /* MODAL OVERLAY (LOBBY / CONNECTION) */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(41, 50, 65, 0.72);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      padding: 16px;
+    }
+
+    .modal-backdrop.hidden {
+      display: none;
+    }
+
+    .lobby-card {
+      background: #FFFDF9;
+      border: 4px solid var(--ink);
+      border-radius: 18px;
+      box-shadow: 0 10px 0 var(--ink);
+      width: 100%;
+      max-width: 680px;
+      padding: 22px 24px;
+      max-height: 94%;
+      overflow-y: auto;
+    }
+
+    .lobby-title {
+      font-size: 1.5rem;
+      font-weight: 900;
+      text-align: center;
+      color: var(--ink);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .lobby-subtitle {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #5C677D;
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .mode-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .mode-box {
+      background: #FFFFFF;
+      border: 3px solid var(--ink);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 4px 0 rgba(41,50,65,0.12);
+    }
+
+    .mode-box h3 {
+      font-size: 1rem;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mode-box p {
+      font-size: 0.82rem;
+      color: #5C677D;
+      line-height: 1.35;
+      font-weight: 600;
+    }
+
+    .room-code-display {
+      background: #FFF3EB;
+      border: 2.5px dashed var(--p1-color);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+      font-size: 1.4rem;
+      font-weight: 900;
+      letter-spacing: 3px;
+      color: var(--p1-dark);
+      user-select: all;
+      -webkit-user-select: all;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .code-input {
+      flex: 1;
+      font-family: inherit;
+      font-weight: 900;
+      font-size: 1.05rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      padding: 8px 12px;
+      border: 2.5px solid var(--ink);
+      border-radius: 9px;
+      text-align: center;
+      outline: none;
+    }
+
+    .code-input:focus {
+      border-color: var(--p2-color);
+      background: #F0FDFA;
+    }
+
+    .local-divider {
+      text-align: center;
+      padding-top: 10px;
+      border-top: 2px dashed #CBD5E1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .status-log {
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #F1F5F9;
+      color: var(--ink);
+      text-align: center;
+      margin-bottom: 12px;
+      border: 2px solid #CBD5E1;
+    }
+
+    /* TOUCH CONTROLS FOR MOBILE/TABLET */
+    .touch-controls {
+      display: none;
+      width: 100%;
+      max-width: 960px;
+      padding: 8px 16px 18px;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    @media (pointer: coarse), (max-width: 768px) {
+      .touch-controls {
+        display: flex;
+      }
+    }
+
+    .touch-cluster {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .touch-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 16px;
+      border: 3px solid var(--ink);
+      background: #fff;
+      box-shadow: 0 4px 0 var(--ink);
+      font-size: 1.35rem;
+      font-weight: 900;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+    }
+
+    .touch-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 var(--ink);
+      background: var(--accent-yellow);
+    }
+
+    .touch-btn.jump-btn {
+      width: 72px;
+      height: 64px;
+      background: var(--p1-color);
+      color: #fff;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">
+        <img src="pawpanic.svg" style="width:24px;height:24px;" alt="Paw Panic" />
+        <span>PAW PANIC!</span>
+        <span style="font-size:0.75rem; background:#FF6B9D; padding:2px 7px; border-radius:6px; font-weight:900;">CO-OP</span>
+      </div>
+      <div class="status-badge" id="connBadge">
+        <span class="status-dot" id="connDot"></span>
+        <span id="connText">Local Mode (1 Device)</span>
+      </div>
+    </div>
+
+    <div class="top-controls">
+      <select class="level-select" id="levelSelect" title="Select Level">
+        <option value="0">Level 1: Friendship Steps</option>
+        <option value="1">Level 2: Alternate Bridge</option>
+        <option value="2">Level 3: Twin Sync</option>
+        <option value="3">Level 4: Bound Together</option>
+        <option value="4">Level 5: The Final Crown</option>
+      </select>
+      <button class="btn btn-yellow" id="btnReset" title="Restart Level (R)">🔄 Restart (R)</button>
+      <button class="btn" id="btnFullscreen" title="Fullscreen (F)">⛶ Fullscreen</button>
+      <button class="btn" id="btnSound" title="Sound Effects">🔊 Sound: ON</button>
+      <button class="btn btn-primary" id="btnOpenLobby">🌐 Online Room</button>
+    </div>
+  </header>
+
+  <!-- GAME STAGE -->
+  <div class="game-wrapper">
+    <canvas id="gameCanvas" width="960" height="540"></canvas>
+
+    <!-- LOBBY / MULTIPLAYER MODAL -->
+    <div class="modal-backdrop" id="lobbyModal">
+      <div class="lobby-card">
+        <div class="lobby-title">🐾 PAW PANIC! ONLINE CO-OP</div>
+        <div class="lobby-subtitle">Work together to grab the key, push heavy blocks, and reach the exit door!</div>
+
+        <div class="status-log" id="lobbyStatus">
+          Click <b>Create Room Code</b> to host, or enter your friend's code in <b>Join Room</b>.
+        </div>
+
+        <div class="mode-grid">
+          <!-- HOST BOX -->
+          <div class="mode-box">
+            <h3 style="color: var(--p1-dark);">🟠 Player 1 — Host Room</h3>
+            <p>Generate a unique room code and share it with your friend to play online.</p>
+            <div class="room-code-display" id="hostCodeDisplay">----</div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-primary" style="flex:1; justify-content:center;" id="btnCreateRoom">✨ Create Room Code</button>
+              <button class="btn" id="btnCopyCode" title="Copy Code">📋 Copy</button>
+            </div>
+          </div>
+
+          <!-- JOIN BOX -->
+          <div class="mode-box">
+            <h3 style="color: var(--p2-dark);">🟢 Player 2 — Join Room</h3>
+            <p>Enter the 4-character room code from Player 1 to connect.</p>
+            <div class="input-row">
+              <input type="text" id="joinCodeInput" class="code-input" placeholder="CODE" maxlength="8" />
+            </div>
+            <button class="btn btn-secondary" style="width:100%; justify-content:center;" id="btnJoinRoom">🚀 Join Room</button>
+          </div>
+        </div>
+
+        <div class="local-divider">
+          <div style="font-size:0.82rem; font-weight:700; color:#475569; text-align:left;">
+            💡 Want to play together on 1 screen / keyboard?<br/>
+            <span style="font-weight:600; color:#64748B;">P1: <b>W, A, D</b> &nbsp;|&nbsp; P2: <b>Arrow Keys (Up, Left, Right)</b></span>
+          </div>
+          <button class="btn btn-yellow" id="btnPlayLocal">🎮 Play Local / Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER EMOTES & CONTROLS -->
+  <div class="hud-footer">
+    <div class="emote-bar">
+      <span class="emote-label">💬 Quick Emotes:</span>
+      <button class="btn" onclick="triggerEmote('JUMP! ⬆️')">1: JUMP!</button>
+      <button class="btn" onclick="triggerEmote('PUSH! 💪')">2: PUSH!</button>
+      <button class="btn" onclick="triggerEmote('WAIT! ✋')">3: WAIT!</button>
+      <button class="btn" onclick="triggerEmote('NICE! 🎉')">4: NICE!</button>
+    </div>
+    <div class="controls-hint" id="controlsHint">
+      <b>Controls:</b> P1 [A/D Walk, W Jump] • P2 [◀/▶ Walk, ▲ Jump] • [R] Reset Level
+    </div>
+  </div>
+
+  <!-- MOBILE TOUCH CONTROLS -->
+  <div class="touch-controls">
+    <div class="touch-cluster">
+      <button class="touch-btn" id="touchLeft">◀</button>
+      <button class="touch-btn" id="touchRight">▶</button>
+    </div>
+    <div class="touch-cluster">
+      <button class="touch-btn" onclick="triggerEmote('HELP! 🐾')" style="font-size:0.9rem; width:64px;">📣</button>
+      <button class="touch-btn jump-btn" id="touchJump">JUMP</button>
+    </div>
+  </div>
+
+<script>
+/**
+ * PICO PARK ONLINE - 2-Player Co-Op Puzzle Platformer
+ * Features:
+ * - WebRTC P2P Online Multiplayer via PeerJS (Room Code system) + Local 2-Player Co-Op
+ * - Player-on-Player stacking & head-riding physics
+ * - Co-op heavy push blocks (require 1 or 2 players pushing simultaneously)
+ * - Hold & Toggle pressure buttons, moving bridges/elevators, timed gates
+ * - Tether Rope mode (Level 4)
+ * - Key follower + Goal Door unlock + Emote callouts + Web Audio retro SFX
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const W = 960;
+const H = 540;
+const GRAVITY = 0.52;
+
+// Internal 2x HiDPI Super-sampling for razor-sharp rendering on Retina/4K/Fullscreen
+canvas.width = 1920;
+canvas.height = 1080;
+ctx.scale(2, 2);
+
+// ==========================================
+// 1. WEB AUDIO SYNTHESIZER (Retro Pico SFX)
+// ==========================================
+let soundEnabled = true;
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) audioCtx = new AudioContext();
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playSFX(type) {
+  if (!soundEnabled) return;
+  initAudio();
+  if (!audioCtx) return;
+
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  if (type === 'jump') {
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(240, now);
+    osc.frequency.exponentialRampToValueAtTime(520, now + 0.11);
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+    osc.start(now);
+    osc.stop(now + 0.12);
+  } else if (type === 'key') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(587.33, now); // D5
+    osc.frequency.setValueAtTime(880, now + 0.08); // A5
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.28);
+    osc.start(now);
+    osc.stop(now + 0.28);
+  } else if (type === 'button') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(420, now);
+    osc.frequency.setValueAtTime(600, now + 0.05);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  } else if (type === 'unlock') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(523.25, now);
+    osc.frequency.setValueAtTime(659.25, now + 0.08);
+    osc.frequency.setValueAtTime(783.99, now + 0.16);
+    osc.frequency.setValueAtTime(1046.5, now + 0.24);
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
+    osc.start(now);
+    osc.stop(now + 0.45);
+  } else if (type === 'win') {
+    const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
+    notes.forEach((freq, i) => {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'square';
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.frequency.setValueAtTime(freq, now + i * 0.09);
+      g.gain.setValueAtTime(0.09, now + i * 0.09);
+      g.gain.linearRampToValueAtTime(0.008, now + i * 0.09 + 0.085);
+      o.start(now + i * 0.09);
+      o.stop(now + i * 0.09 + 0.09);
+    });
+  } else if (type === 'dead') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.linearRampToValueAtTime(110, now + 0.25);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.26);
+    osc.start(now);
+    osc.stop(now + 0.26);
+  } else if (type === 'emote') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(680, now);
+    osc.frequency.exponentialRampToValueAtTime(920, now + 0.09);
+    gain.gain.setValueAtTime(0.09, now);
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }
+}
+
+document.getElementById('btnSound').addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  document.getElementById('btnSound').textContent = soundEnabled ? '🔊 Suara: ON' : '🔇 Suara: OFF';
+});
+
+function toggleFullscreen() {
+  const wrapper = document.querySelector('.game-wrapper');
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    if (wrapper.requestFullscreen) {
+      wrapper.requestFullscreen().catch(() => {});
+    } else if (wrapper.webkitRequestFullscreen) {
+      wrapper.webkitRequestFullscreen();
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  }
+}
+
+document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+
+document.addEventListener('fullscreenchange', () => {
+  const isFs = !!document.fullscreenElement;
+  document.getElementById('btnFullscreen').textContent = isFs ? '↩ Keluar Layar Penuh' : '⛶ Fullscreen';
+});
+
+// ==========================================
+// 2. NETWORKING (Socket.IO + PeerJS Fallback)
+// ==========================================
+let netMode = 'local'; // 'local' | 'host' | 'client'
+let peer = null;
+let conn = null;
+let socket = null;
+let isSocketPaired = false;
+let roomCode = '';
+let remoteInput = { left: false, right: false, jump: false, jumpPressed: false };
+let pingMs = 0;
+let lastPingSent = 0;
+
+const connDot = document.getElementById('connDot');
+const connText = document.getElementById('connText');
+const lobbyStatus = document.getElementById('lobbyStatus');
+const lobbyModal = document.getElementById('lobbyModal');
+const controlsHint = document.getElementById('controlsHint');
+
+function isNetworkConnected() {
+  if (socket && socket.connected) {
+    return isSocketPaired;
+  }
+  return !!(conn && conn.open);
+}
+
+function networkSend(data) {
+  if (socket && socket.connected) {
+    socket.emit('game-msg', data);
+  } else if (conn && conn.open) {
+    conn.send(data);
+  }
+}
+
+function setLobbyStatus(msg, bg = '#F1F5F9') {
+  lobbyStatus.innerHTML = msg;
+  lobbyStatus.style.background = bg;
+}
+
+function updateHeaderBadge() {
+  if (netMode === 'local') {
+    connDot.className = 'status-dot';
+    connText.textContent = 'Local Mode (2 Players on 1 Screen)';
+    controlsHint.innerHTML = '<b>Local Controls:</b> P1 [A/D Walk, W Jump] • P2 [◀/▶ Walk, ▲ Jump] • [R] Restart';
+  } else if (netMode === 'host') {
+    if (isNetworkConnected()) {
+      connDot.className = 'status-dot online';
+      connText.textContent = `Online (Host: ${roomCode}) • P2 Connected ${pingMs ? '(' + pingMs + 'ms)' : ''}`;
+      controlsHint.innerHTML = '<b>You are Player 1 (Orange):</b> Use [A/D] or [◀/▶] to Walk, [W / ▲ / Space] to Jump';
+    } else {
+      connDot.className = 'status-dot waiting';
+      connText.textContent = `Waiting for P2... (Code: ${roomCode})`;
+    }
+  } else if (netMode === 'client') {
+    if (isNetworkConnected()) {
+      connDot.className = 'status-dot online';
+      connText.textContent = `Online (Client: ${roomCode}) • Connected ${pingMs ? '(' + pingMs + 'ms)' : ''}`;
+      controlsHint.innerHTML = '<b>You are Player 2 (Teal):</b> Use [A/D] or [◀/▶] to Walk, [W / ▲ / Space] to Jump';
+    } else {
+      connDot.className = 'status-dot waiting';
+      connText.textContent = `Connecting to ${roomCode}...`;
+    }
+  }
+}
+
+function generateShortCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = '';
+  for (let i = 0; i < 4; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+// Inisialisasi Socket.IO jika tersedia (dijalankan via Node server)
+const serverOrigin = (window.location && window.location.protocol && window.location.protocol.startsWith('http'))
+  ? window.location.origin
+  : 'http://localhost:3003';
+
+if (typeof io !== 'undefined') {
+  try {
+    socket = io(serverOrigin, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+      timeout: 5000
+    });
+    socket.on('connect', () => {
+      setLobbyStatus('⚡ Connected to Game Server (Socket.IO ready). Create or join a room!', '#EFF6FF');
+    });
+
+    socket.on('player-joined', () => {
+      if (netMode === 'host') {
+        isSocketPaired = true;
+        updateHeaderBadge();
+        playSFX('unlock');
+        setLobbyStatus(`🎉 Player 2 joined Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
+        setTimeout(() => {
+          lobbyModal.classList.add('hidden');
+        }, 650);
+        loadLevel(currentLevelIdx, false);
+        sendHostState();
+      }
+    });
+
+    socket.on('game-ready', () => {
+      if (netMode === 'client') {
+        isSocketPaired = true;
+        updateHeaderBadge();
+        playSFX('unlock');
+        setLobbyStatus(`🎉 Successfully connected to Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
+        setTimeout(() => {
+          lobbyModal.classList.add('hidden');
+        }, 650);
+      }
+    });
+
+    socket.on('game-msg', (data) => {
+      handleNetworkData(data);
+    });
+
+    socket.on('peer-disconnected', (data) => {
+      setLobbyStatus(`⚠️ ${(data && data.reason) || 'Connection lost'}. Returned to Local Mode.`, '#FEE2E2');
+      netMode = 'local';
+      isSocketPaired = false;
+      updateHeaderBadge();
+    });
+  } catch (e) {
+    socket = null;
+  }
+}
+
+document.getElementById('btnCreateRoom').addEventListener('click', () => {
+  if (socket && socket.connected) {
+    socket.emit('create-room', (res) => {
+      if (res && res.ok) {
+        roomCode = res.code;
+        netMode = 'host';
+        isSocketPaired = false;
+        document.getElementById('hostCodeDisplay').textContent = roomCode;
+        updateHeaderBadge();
+        setLobbyStatus(`✅ Room <b>${roomCode}</b> active on server! Share code with your friend. Waiting for Player 2...`, '#DCFCE7');
+      } else {
+        setLobbyStatus('⚠️ Failed to create room on server.', '#FEE2E2');
+      }
+    });
+    return;
+  }
+
+  // Fallback: PeerJS
+  if (typeof Peer === 'undefined') {
+    setLobbyStatus('⚠️ Network library not loaded. Check internet connection or start server.', '#FEE2E2');
+    return;
+  }
+  if (peer) peer.destroy();
+
+  roomCode = generateShortCode();
+  const fullPeerId = 'picopark-id-' + roomCode.toLowerCase();
+  document.getElementById('hostCodeDisplay').textContent = roomCode;
+  setLobbyStatus(`⏳ Preparing room <b>${roomCode}</b> (WebRTC)...`, '#FEF3C7');
+
+  peer = new Peer(fullPeerId, {
+    debug: 1,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    }
+  });
+
+  peer.on('open', () => {
+    netMode = 'host';
+    updateHeaderBadge();
+    setLobbyStatus(`✅ Room <b>${roomCode}</b> active! Share this code with your friend. Waiting for Player 2...`, '#DCFCE7');
+  });
+
+  peer.on('connection', (incomingConn) => {
+    conn = incomingConn;
+    setupConnectionHandlers();
+  });
+
+  peer.on('error', (err) => {
+    setLobbyStatus(`⚠️ Failed to create room (${err.type}). Try clicking Create Room Code again.`, '#FEE2E2');
+  });
+});
+
+document.getElementById('btnJoinRoom').addEventListener('click', () => {
+  const rawCode = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+  if (rawCode.length < 3) {
+    setLobbyStatus('⚠️ Please enter the 4-character room code from Player 1!', '#FEE2E2');
+    return;
+  }
+
+  if (socket && socket.connected) {
+    setLobbyStatus(`⏳ Connecting to Room <b>${rawCode}</b> on server...`, '#FEF3C7');
+    socket.emit('join-room', rawCode, (res) => {
+      if (res && res.ok) {
+        roomCode = res.code;
+        netMode = 'client';
+        isSocketPaired = true;
+        updateHeaderBadge();
+        playSFX('unlock');
+        setLobbyStatus(`🎉 Successfully connected to Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
+        setTimeout(() => {
+          lobbyModal.classList.add('hidden');
+        }, 650);
+      } else {
+        setLobbyStatus(`⚠️ ${(res && res.error) || 'Failed to connect to room'}`, '#FEE2E2');
+      }
+    });
+    return;
+  }
+
+  // Fallback: PeerJS
+  if (typeof Peer === 'undefined') {
+    setLobbyStatus('⚠️ Network library not loaded. Check internet connection or start server.', '#FEE2E2');
+    return;
+  }
+
+  if (peer) peer.destroy();
+  roomCode = rawCode;
+  setLobbyStatus(`⏳ Connecting to Room <b>${roomCode}</b> (WebRTC)...`, '#FEF3C7');
+
+  peer = new Peer({
+    debug: 1,
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    }
+  });
+  peer.on('open', () => {
+    netMode = 'client';
+    updateHeaderBadge();
+    const targetPeerId = 'picopark-id-' + roomCode.toLowerCase();
+    conn = peer.connect(targetPeerId, { reliable: true });
+    setupConnectionHandlers();
+  });
+
+  peer.on('error', (err) => {
+    setLobbyStatus(`⚠️ Room <b>${roomCode}</b> not found (${err.type}). Ensure code is correct!`, '#FEE2E2');
+  });
+});
+
+function handleNetworkData(data) {
+  if (!data || !data.type) return;
+
+  if (data.type === 'input' && netMode === 'host') {
+    remoteInput.left = !!data.left;
+    remoteInput.right = !!data.right;
+    remoteInput.jump = !!data.jump;
+    if (data.jumpPressed) remoteInput.jumpPressed = true;
+  } else if (data.type === 'state' && netMode === 'client') {
+    applyHostState(data);
+  } else if (data.type === 'emote') {
+    showEmoteBubble(data.playerIdx, data.text);
+  } else if (data.type === 'sfx' && netMode === 'client') {
+    playSFX(data.sfx);
+  } else if (data.type === 'cmd' && netMode === 'host') {
+    if (data.action === 'reset') loadLevel(currentLevelIdx, true);
+    if (data.action === 'level') loadLevel(data.levelIdx, true);
+  } else if (data.type === 'ping') {
+    networkSend({ type: 'pong', t: data.t });
+  } else if (data.type === 'pong') {
+    pingMs = Math.max(1, Math.round(performance.now() - data.t));
+    updateHeaderBadge();
+  }
+}
+
+function setupConnectionHandlers() {
+  conn.on('open', () => {
+    updateHeaderBadge();
+    playSFX('unlock');
+    setLobbyStatus(`🎉 Successfully connected to Room <b>${roomCode}</b>! Have fun!`, '#DCFCE7');
+    setTimeout(() => {
+      lobbyModal.classList.add('hidden');
+    }, 650);
+
+    if (netMode === 'host') {
+      loadLevel(currentLevelIdx, false);
+      sendHostState();
+    }
+  });
+
+  conn.on('data', (data) => {
+    handleNetworkData(data);
+  });
+
+  conn.on('close', () => {
+    setLobbyStatus('⚠️ Connection lost. Returned to Local Mode.', '#FEE2E2');
+    netMode = 'local';
+    conn = null;
+    updateHeaderBadge();
+  });
+}
+
+document.getElementById('btnCopyCode').addEventListener('click', () => {
+  if (!roomCode) return;
+  navigator.clipboard.writeText(roomCode).then(() => {
+    setLobbyStatus(`📋 Kode <b>${roomCode}</b> berhasil disalin! Kirim ke temanmu sekarang.`, '#DCFCE7');
+  });
+});
+
+document.getElementById('btnOpenLobby').addEventListener('click', () => {
+  lobbyModal.classList.remove('hidden');
+});
+
+document.getElementById('btnPlayLocal').addEventListener('click', () => {
+  lobbyModal.classList.add('hidden');
+});
+
+// Ping timer every 2 seconds
+setInterval(() => {
+  if (isNetworkConnected()) {
+    lastPingSent = performance.now();
+    networkSend({ type: 'ping', t: lastPingSent });
+  }
+}, 2000);
+
+// ==========================================
+// 3. LEVEL DEFINITIONS (5 Co-Op Stages)
+// ==========================================
+const LEVELS = [
+  // LEVEL 1: Friendship Steps (Stack Jump + 2P Heavy Block)
+  {
+    name: "Level 1: Friendship Steps",
+    subtitle: "Jump on your friend's head to reach the key, then push the [2] block together!",
+    tether: false,
+    spawns: [{ x: 80, y: 400 }, { x: 145, y: 400 }],
+    walls: [
+      { x: 0, y: 0, w: 960, h: 28 },         // Ceiling
+      { x: 0, y: 0, w: 28, h: 540 },         // Left wall
+      { x: 932, y: 0, w: 28, h: 540 },       // Right wall
+      { x: 0, y: 468, w: 460, h: 72 },       // Left floor
+      { x: 548, y: 468, w: 412, h: 72 },     // Right floor (gap of 88px between 460..548)
+      { x: 150, y: 345, w: 150, h: 24 },     // High key platform (123px above floor -> requires stacking!)
+    ],
+    blocks: [
+      // Heavy block that drops into the 88px gap so players can walk across!
+      { x: 330, y: 388, w: 80, h: 80, req: 2 }
+    ],
+    buttons: [],
+    movers: [],
+    key: { x: 225, y: 300 },
+    door: { x: 835, y: 396 }
+  },
+
+  // LEVEL 2: Alternate Bridge (Hold Button + Toggle Switch)
+  {
+    name: "Level 2: Alternate Bridge",
+    subtitle: "One cat holds the purple switch so your partner can cross & trigger the green toggle!",
+    tether: false,
+    spawns: [{ x: 75, y: 400 }, { x: 135, y: 400 }],
+    walls: [
+      { x: 0, y: 0, w: 960, h: 28 },
+      { x: 0, y: 0, w: 28, h: 540 },
+      { x: 932, y: 0, w: 28, h: 540 },
+      { x: 0, y: 468, w: 300, h: 72 },       // Start floor
+      { x: 450, y: 468, w: 210, h: 72 },     // Middle island
+      { x: 775, y: 468, w: 185, h: 72 },     // Goal island
+      { x: 470, y: 345, w: 170, h: 22 }      // Upper middle ledge for key (stack jump!)
+    ],
+    blocks: [
+      { x: 200, y: 408, w: 60, h: 60, req: 1 }
+    ],
+    buttons: [
+      // Hold button on start island -> extends bridge 0
+      { id: 'b1', x: 110, y: 456, w: 46, h: 12, mode: 'hold', color: '#8B5CF6', targetId: 'm1' },
+      // Toggle button on middle island -> permanently activates bridge 1 + locks bridge 0
+      { id: 'b2', x: 585, y: 456, w: 46, h: 12, mode: 'toggle', color: '#10B981', targetId: 'm2' }
+    ],
+    movers: [
+      // Bridge 1 between start and middle island
+      { id: 'm1', x: 300, y: 468, w: 150, h: 22, activeX: 300, activeY: 468, idleX: 300, idleY: 560, color: '#8B5CF6', alsoBy: 'b2' },
+      // Bridge 2 between middle and goal island
+      { id: 'm2', x: 660, y: 560, w: 115, h: 22, activeX: 660, activeY: 468, idleX: 660, idleY: 560, color: '#10B981' }
+    ],
+    key: { x: 555, y: 300 },
+    door: { x: 855, y: 396 }
+  },
+
+  // LEVEL 3: Twin Sync (Simultaneous Dual Switches + Heavy Vault)
+  {
+    name: "Level 3: Twin Sync",
+    subtitle: "Step on both yellow buttons SIMULTANEOUSLY to unlock the vault gate & reach the block!",
+    tether: false,
+    spawns: [{ x: 80, y: 400 }, { x: 140, y: 400 }],
+    walls: [
+      { x: 0, y: 0, w: 960, h: 28 },
+      { x: 0, y: 0, w: 28, h: 540 },
+      { x: 932, y: 0, w: 28, h: 540 },
+      { x: 0, y: 468, w: 960, h: 72 },       // Full bottom floor
+      { x: 65, y: 372, w: 140, h: 22 },      // Left switch platform (96px high -> solo jumpable!)
+      { x: 390, y: 372, w: 140, h: 22 },     // Right switch platform (96px high -> solo jumpable!)
+      { x: 750, y: 315, w: 182, h: 24 }      // High exit balcony (requires 2P block + jumping!)
+    ],
+    blocks: [
+      { x: 625, y: 388, w: 80, h: 80, req: 2 }
+    ],
+    buttons: [
+      { id: 'sync1', x: 110, y: 360, w: 48, h: 12, mode: 'sync', color: '#F59E0B', targetId: 'gate1' },
+      { id: 'sync2', x: 435, y: 360, w: 48, h: 12, mode: 'sync', color: '#F59E0B', targetId: 'gate1' }
+    ],
+    movers: [
+      // Vertical stone gate separating the vault
+      { id: 'gate1', x: 575, y: 200, w: 26, h: 268, activeX: 575, activeY: -80, idleX: 575, idleY: 200, color: '#F59E0B' }
+    ],
+    key: { x: 665, y: 340 },
+    door: { x: 845, y: 243 }
+  },
+
+  // LEVEL 4: Bound Together (Tether Rope Co-Op Mode!)
+  {
+    name: "Level 4: Bound Together (Tether Rope)",
+    subtitle: "You are connected by an elastic rope! Don't jump too far ahead or you will drag your friend down!",
+    tether: true,
+    tetherLength: 175,
+    spawns: [{ x: 70, y: 380 }, { x: 125, y: 380 }],
+    walls: [
+      { x: 0, y: 0, w: 960, h: 28 },
+      { x: 0, y: 0, w: 28, h: 540 },
+      { x: 932, y: 0, w: 28, h: 540 },
+      { x: 0, y: 450, w: 210, h: 90 },       // Island 1
+      { x: 285, y: 410, w: 145, h: 130 },    // Island 2
+      { x: 505, y: 365, w: 150, h: 175 },    // Island 3
+      { x: 730, y: 430, w: 202, h: 110 },    // Island 4 (Door)
+      { x: 295, y: 285, w: 125, h: 22 }      // Key overhead platform (125px above Island 2 -> stack jump!)
+    ],
+    blocks: [],
+    buttons: [
+      { id: 'tb1', x: 555, y: 353, w: 48, h: 12, mode: 'toggle', color: '#EC4899', targetId: 'tm1' }
+    ],
+    movers: [
+      { id: 'tm1', x: 655, y: 550, w: 75, h: 20, activeX: 655, activeY: 430, idleX: 655, idleY: 550, color: '#EC4899' }
+    ],
+    key: { x: 357, y: 240 },
+    door: { x: 840, y: 358 }
+  },
+
+  // LEVEL 5: The Final Crown (Elevator + Heavy Block + Key Relay)
+  {
+    name: "Level 5: The Final Crown",
+    subtitle: "Push the [2] block onto the purple switch to power the lift, grab the key, and enter the crown door!",
+    tether: false,
+    spawns: [{ x: 175, y: 400 }, { x: 225, y: 400 }],
+    walls: [
+      { x: 0, y: 0, w: 960, h: 28 },
+      { x: 0, y: 0, w: 28, h: 540 },
+      { x: 932, y: 0, w: 28, h: 540 },
+      { x: 0, y: 468, w: 620, h: 72 },       // Main lower floor
+      { x: 735, y: 468, w: 225, h: 72 },     // Bottom right floor
+      { x: 160, y: 225, w: 370, h: 24 },     // Upper skyway
+      { x: 650, y: 225, w: 282, h: 24 }      // Upper goal skyway
+    ],
+    blocks: [
+      // Push this 2-player block onto the purple hold button at x=490 so both players can ride the oscillating lift!
+      { x: 310, y: 398, w: 70, h: 70, req: 2 }
+    ],
+    buttons: [
+      // Hold button on lower floor -> activates oscillating elevator at x=48
+      { id: 'f1', x: 490, y: 456, w: 54, h: 12, mode: 'hold', color: '#8B5CF6', targetId: 'lift1' },
+      // Toggle button on upper skyway -> extends sky bridge
+      { id: 'f2', x: 450, y: 213, w: 48, h: 12, mode: 'toggle', color: '#10B981', targetId: 'skybridge' }
+    ],
+    movers: [
+      // Oscillating Elevator on far left that carries players between y=446 and y=225 when active!
+      { id: 'lift1', x: 48, y: 446, w: 108, h: 22, activeX: 48, activeY: 225, idleX: 48, idleY: 446, oscillate: true, color: '#8B5CF6' },
+      // Skybridge connecting upper skyways
+      { id: 'skybridge', x: 530, y: 560, w: 120, h: 22, activeX: 530, activeY: 225, idleX: 530, idleY: 560, color: '#10B981' }
+    ],
+    key: { x: 830, y: 420 },
+    door: { x: 840, y: 153 }
+  }
+];
+
+// ==========================================
+// 4. GAME STATE & ENTITIES
+// ==========================================
+let currentLevelIdx = 0;
+let levelClearTimer = 0;
+let allGameWon = false;
+let hostStateTick = 0;
+let particles = [];
+
+const PLAYER_W = 40;
+const PLAYER_H = 44;
+
+let players = [];
+let walls = [];
+let blocks = [];
+let buttons = [];
+let movers = [];
+let keyItem = null;
+let door = null;
+let tetherConfig = { active: false, length: 180 };
+
+function createPlayer(idx, x, y) {
+  return {
+    idx,
+    label: idx === 0 ? '1P' : '2P',
+    color: idx === 0 ? '#FF7A29' : '#2EC4B6',
+    darkColor: idx === 0 ? '#C84B00' : '#177E73',
+    x,
+    y,
+    targetX: x,
+    targetY: y,
+    vx: 0,
+    vy: 0,
+    w: PLAYER_W,
+    h: PLAYER_H,
+    onGround: false,
+    standingOnPlayer: null,
+    facing: 1,
+    walkFrame: 0,
+    pushingBlock: false,
+    sweating: false,
+    inDoor: false,
+    emoteText: '',
+    emoteTimer: 0
+  };
+}
+
+function loadLevel(idx, broadcast = true) {
+  currentLevelIdx = idx;
+  document.getElementById('levelSelect').value = String(idx);
+  const lvl = LEVELS[idx];
+  levelClearTimer = 0;
+  allGameWon = false;
+  particles = [];
+
+  players = [
+    createPlayer(0, lvl.spawns[0].x, lvl.spawns[0].y),
+    createPlayer(1, lvl.spawns[1].x, lvl.spawns[1].y)
+  ];
+
+  walls = lvl.walls.map(w => ({ ...w }));
+  blocks = lvl.blocks.map(b => ({
+    ...b,
+    vx: 0,
+    vy: 0,
+    pushersLeft: 0,
+    pushersRight: 0
+  }));
+
+  buttons = lvl.buttons.map(b => ({
+    ...b,
+    pressed: false,
+    toggled: false
+  }));
+
+  movers = lvl.movers.map(m => ({
+    ...m,
+    dx: 0,
+    dy: 0,
+    active: false,
+    oscDir: 1
+  }));
+
+  keyItem = {
+    x: lvl.key.x,
+    y: lvl.key.y,
+    baseY: lvl.key.y,
+    carrierIdx: -1,
+    used: false,
+    floatTick: 0
+  };
+
+  door = {
+    x: lvl.door.x,
+    y: lvl.door.y,
+    w: 54,
+    h: 72,
+    unlocked: false,
+    openProgress: 0
+  };
+
+  tetherConfig = {
+    active: !!lvl.tether,
+    length: lvl.tetherLength || 175
+  };
+
+  if (broadcast && netMode === 'client' && isNetworkConnected()) {
+    networkSend({ type: 'cmd', action: 'level', levelIdx: idx });
+  }
+}
+
+document.getElementById('levelSelect').addEventListener('change', (e) => {
+  const idx = parseInt(e.target.value, 10);
+  loadLevel(idx, true);
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  if (netMode === 'client' && isNetworkConnected()) {
+    networkSend({ type: 'cmd', action: 'reset' });
+  } else {
+    loadLevel(currentLevelIdx, true);
+  }
+});
+
+// ==========================================
+// 5. INPUT HANDLING (Keyboard + Touch)
+// ==========================================
+const keys = {};
+const justPressed = {};
+
+window.addEventListener('keydown', (e) => {
+  if (document.activeElement === document.getElementById('joinCodeInput')) return;
+
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+    e.preventDefault();
+  }
+  if (!keys[e.code]) {
+    justPressed[e.code] = true;
+  }
+  keys[e.code] = true;
+
+  if (e.code === 'KeyR') {
+    if (netMode === 'client' && isNetworkConnected()) {
+      networkSend({ type: 'cmd', action: 'reset' });
+    } else {
+      loadLevel(currentLevelIdx, true);
+    }
+  }
+  if (e.code === 'KeyF') {
+    toggleFullscreen();
+  }
+  if (e.code === 'Digit1') triggerEmote('LOMPAT! ⬆️');
+  if (e.code === 'Digit2') triggerEmote('DORONG! 💪');
+  if (e.code === 'Digit3') triggerEmote('TUNGGU! ✋');
+  if (e.code === 'Digit4') triggerEmote('MANTAP! 🎉');
+});
+
+window.addEventListener('keyup', (e) => {
+  keys[e.code] = false;
+});
+
+// Touch buttons
+const touchState = { left: false, right: false, jump: false, jumpPressed: false };
+function bindTouch(id, prop) {
+  const el = document.getElementById(id);
+  const start = (e) => {
+    e.preventDefault();
+    if (prop === 'jump' && !touchState.jump) touchState.jumpPressed = true;
+    touchState[prop] = true;
+  };
+  const end = (e) => {
+    e.preventDefault();
+    touchState[prop] = false;
+  };
+  el.addEventListener('touchstart', start, { passive: false });
+  el.addEventListener('touchend', end, { passive: false });
+  el.addEventListener('mousedown', start);
+  el.addEventListener('mouseup', end);
+  el.addEventListener('mouseleave', end);
+}
+bindTouch('touchLeft', 'left');
+bindTouch('touchRight', 'right');
+bindTouch('touchJump', 'jump');
+
+let lastSentInput = { left: false, right: false, jump: false };
+let lastInputSentTime = 0;
+
+function getPlayerInputs() {
+  if (netMode === 'local') {
+    // Player 1: W, A, D (plus touch controls)
+    const p1 = {
+      left: !!keys['KeyA'] || touchState.left,
+      right: !!keys['KeyD'] || touchState.right,
+      jump: !!keys['KeyW'] || !!keys['Space'] || touchState.jump,
+      jumpPressed: !!justPressed['KeyW'] || !!justPressed['Space'] || touchState.jumpPressed
+    };
+    // Player 2: Arrow keys
+    const p2 = {
+      left: !!keys['ArrowLeft'],
+      right: !!keys['ArrowRight'],
+      jump: !!keys['ArrowUp'],
+      jumpPressed: !!justPressed['ArrowUp']
+    };
+    return [p1, p2];
+  } else if (netMode === 'host') {
+    // Host is Player 1 (can use EITHER WASD or Arrows!)
+    const p1 = {
+      left: !!keys['KeyA'] || !!keys['ArrowLeft'] || touchState.left,
+      right: !!keys['KeyD'] || !!keys['ArrowRight'] || touchState.right,
+      jump: !!keys['KeyW'] || !!keys['ArrowUp'] || !!keys['Space'] || touchState.jump,
+      jumpPressed: !!justPressed['KeyW'] || !!justPressed['ArrowUp'] || !!justPressed['Space'] || touchState.jumpPressed
+    };
+    const p2 = {
+      left: remoteInput.left,
+      right: remoteInput.right,
+      jump: remoteInput.jump,
+      jumpPressed: remoteInput.jumpPressed
+    };
+    remoteInput.jumpPressed = false;
+    return [p1, p2];
+  } else {
+    // Client sends input to host
+    const myInput = {
+      type: 'input',
+      left: !!keys['KeyA'] || !!keys['ArrowLeft'] || touchState.left,
+      right: !!keys['KeyD'] || !!keys['ArrowRight'] || touchState.right,
+      jump: !!keys['KeyW'] || !!keys['ArrowUp'] || !!keys['Space'] || touchState.jump,
+      jumpPressed: !!justPressed['KeyW'] || !!justPressed['ArrowUp'] || !!justPressed['Space'] || touchState.jumpPressed
+    };
+
+    const now = performance.now();
+    const hasChanged = myInput.left !== lastSentInput.left ||
+                       myInput.right !== lastSentInput.right ||
+                       myInput.jump !== lastSentInput.jump ||
+                       myInput.jumpPressed;
+
+    if (isNetworkConnected() && (hasChanged || (now - lastInputSentTime > 45))) {
+      networkSend(myInput);
+      lastSentInput.left = myInput.left;
+      lastSentInput.right = myInput.right;
+      lastSentInput.jump = myInput.jump;
+      lastInputSentTime = now;
+    }
+
+    return [
+      { left: false, right: false, jump: false, jumpPressed: false },
+      myInput
+    ];
+  }
+}
+
+// ==========================================
+// 6. EMOTE & PARTICLE HELPERS
+// ==========================================
+function showEmoteBubble(playerIdx, text) {
+  if (!players[playerIdx]) return;
+  players[playerIdx].emoteText = text;
+  players[playerIdx].emoteTimer = 130;
+  playSFX('emote');
+}
+
+window.triggerEmote = function(text) {
+  const myIdx = netMode === 'client' ? 1 : 0;
+  showEmoteBubble(myIdx, text);
+  if (isNetworkConnected()) {
+    networkSend({ type: 'emote', playerIdx: myIdx, text });
+  }
+};
+
+function spawnConfetti(x, y, count = 32) {
+  const colors = ['#FF7A29', '#2EC4B6', '#FFD166', '#EF476F', '#8B5CF6', '#10B981', '#38BDF8'];
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 11,
+      vy: (Math.random() - 0.85) * 10,
+      size: 6 + Math.random() * 6,
+      rot: Math.random() * Math.PI * 2,
+      vrot: (Math.random() - 0.5) * 0.35,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      life: 55 + Math.random() * 35,
+      maxLife: 90,
+      shape: Math.random() > 0.3 ? 'rect' : 'star'
+    });
+  }
+}
+
+function spawnDust(x, y, count = 6) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: x + (Math.random() - 0.5) * 16,
+      y: y + (Math.random() - 0.5) * 4,
+      vx: (Math.random() - 0.5) * 2.5,
+      vy: -Math.random() * 1.5 - 0.5,
+      size: 4 + Math.random() * 4,
+      rot: 0,
+      vrot: 0,
+      color: 'rgba(148, 163, 184, 0.45)',
+      life: 18 + Math.random() * 10,
+      maxLife: 28,
+      shape: 'circle'
+    });
+  }
+}
+
+// ==========================================
+// 7. PHYSICS & CO-OP COLLISION ENGINE
+// ==========================================
+function rectOverlap(a, b) {
+  return (
+    a.x < b.x + b.w &&
+    a.x + a.w > b.x &&
+    a.y < b.y + b.h &&
+    a.y + a.h > b.y
+  );
+}
+
+function getSolidObstacles() {
+  return [...walls, ...movers];
+}
+
+function updatePhysics() {
+  const inputs = getPlayerInputs();
+
+  // Clear one-frame input flags
+  for (const k in justPressed) delete justPressed[k];
+  touchState.jumpPressed = false;
+
+  if (netMode === 'client') {
+    // 1. Smooth LERP interpolation for networked entities
+    players.forEach((p, idx) => {
+      if (typeof p.targetX === 'number') {
+        const factor = idx === 1 ? 0.35 : 0.48;
+        p.x += (p.targetX - p.x) * factor;
+        p.y += (p.targetY - p.y) * factor;
+      }
+    });
+    blocks.forEach(b => {
+      if (typeof b.targetX === 'number') {
+        b.x += (b.targetX - b.x) * 0.45;
+        b.y += (b.targetY - b.y) * 0.45;
+      }
+    });
+    movers.forEach(m => {
+      if (typeof m.targetX === 'number') {
+        m.x += (m.targetX - m.x) * 0.45;
+        m.y += (m.targetY - m.y) * 0.45;
+      }
+    });
+    if (keyItem && typeof keyItem.targetX === 'number') {
+      keyItem.x += (keyItem.targetX - keyItem.x) * 0.35;
+      keyItem.y += (keyItem.targetY - keyItem.y) * 0.35;
+    }
+
+    // 2. Client-side local prediction for Player 2 (0ms input latency)
+    const inp = inputs[1];
+    const p2 = players[1];
+    if (p2 && !p2.inDoor) {
+      if (inp.left && !inp.right) {
+        p2.facing = -1;
+        p2.walkFrame += 0.22;
+        p2.x -= 4.1 * 0.35;
+      } else if (inp.right && !inp.left) {
+        p2.facing = 1;
+        p2.walkFrame += 0.22;
+        p2.x += 4.1 * 0.35;
+      } else {
+        p2.walkFrame = 0;
+      }
+      if (inp.jumpPressed) {
+        p2.vy = -10.8;
+        spawnDust(p2.x + p2.w / 2, p2.y + p2.h, 6);
+        playSFX('jump');
+      }
+    }
+
+    updateParticles();
+    return;
+  }
+
+  if (levelClearTimer > 0) {
+    levelClearTimer++;
+    updateParticles();
+    if (levelClearTimer === 95) {
+      if (currentLevelIdx < LEVELS.length - 1) {
+        loadLevel(currentLevelIdx + 1, false);
+      } else {
+        allGameWon = true;
+      }
+    }
+    if (netMode === 'host') sendHostState();
+    return;
+  }
+
+  // 1. UPDATE BUTTONS & MOVERS
+  const syncButtons = buttons.filter(b => b.mode === 'sync');
+  let allSyncPressed = syncButtons.length > 0;
+
+  buttons.forEach(btn => {
+    const triggerZone = { x: btn.x + 2, y: btn.y - 6, w: btn.w - 4, h: btn.h + 6 };
+    let isDown = false;
+    players.forEach(p => {
+      if (!p.inDoor && rectOverlap(p, triggerZone)) isDown = true;
+    });
+    blocks.forEach(bl => {
+      if (rectOverlap(bl, triggerZone)) isDown = true;
+    });
+
+    if (isDown && !btn.pressed) {
+      playSFX('button');
+      if (netMode === 'host' && isNetworkConnected()) networkSend({ type: 'sfx', sfx: 'button' });
+    }
+    btn.pressed = isDown;
+
+    if (btn.mode === 'toggle' && isDown) {
+      btn.toggled = true;
+    }
+    if (btn.mode === 'sync' && !isDown) {
+      allSyncPressed = false;
+    }
+  });
+
+  if (allSyncPressed && syncButtons.length > 0) {
+    syncButtons.forEach(b => { b.toggled = true; });
+  }
+
+  movers.forEach(m => {
+    let shouldActivate = false;
+    buttons.forEach(b => {
+      if (b.targetId === m.id || m.alsoBy === b.id) {
+        if (b.mode === 'hold' && b.pressed) shouldActivate = true;
+        if ((b.mode === 'toggle' || b.mode === 'sync') && b.toggled) shouldActivate = true;
+      }
+    });
+    m.active = shouldActivate;
+    const prevX = m.x;
+    const prevY = m.y;
+
+    let targetX = m.active ? m.activeX : m.idleX;
+    let targetY = m.active ? m.activeY : m.idleY;
+
+    if (m.oscillate && m.active) {
+      targetY = m.oscDir === 1 ? m.activeY : m.idleY;
+      if (Math.abs(m.y - targetY) < 2) {
+        m.oscDir *= -1;
+      }
+    }
+
+    const speed = m.oscillate ? 2.2 : 3.2;
+    const diffX = targetX - m.x;
+    const diffY = targetY - m.y;
+    m.x += Math.abs(diffX) <= speed ? diffX : Math.sign(diffX) * speed;
+    m.y += Math.abs(diffY) <= speed ? diffY : Math.sign(diffY) * speed;
+    m.dx = m.x - prevX;
+    m.dy = m.y - prevY;
+
+    // Carry players standing on top of mover
+    players.forEach(p => {
+      if (p.inDoor) return;
+      const onTop =
+        p.x + p.w > m.x &&
+        p.x < m.x + m.w &&
+        Math.abs((p.y + p.h) - prevY) <= 7;
+      if (onTop) {
+        p.x += m.dx;
+        p.y += m.dy;
+      }
+    });
+  });
+
+  // 2. PLAYER INPUT & HORIZONTAL VELOCITY
+  const MOVE_SPEED = 4.1;
+  const JUMP_FORCE = -10.8;
+
+  players.forEach((p, idx) => {
+    if (p.inDoor) return;
+    const inp = inputs[idx];
+    p.pushingBlock = false;
+    p.sweating = false;
+
+    if (inp.left && !inp.right) {
+      p.vx = -MOVE_SPEED;
+      p.facing = -1;
+      p.walkFrame += 0.22;
+    } else if (inp.right && !inp.left) {
+      p.vx = MOVE_SPEED;
+      p.facing = 1;
+      p.walkFrame += 0.22;
+    } else {
+      p.vx *= 0.65;
+      if (Math.abs(p.vx) < 0.1) p.vx = 0;
+      p.walkFrame = 0;
+    }
+
+    if (inp.jumpPressed && p.onGround) {
+      p.vy = JUMP_FORCE;
+      p.onGround = false;
+      p.standingOnPlayer = null;
+      spawnDust(p.x + p.w / 2, p.y + p.h, 8);
+      playSFX('jump');
+      if (netMode === 'host' && isNetworkConnected()) networkSend({ type: 'sfx', sfx: 'jump' });
+    }
+
+    p.vy = Math.min(p.vy + GRAVITY, 12.5);
+    if (p.emoteTimer > 0) p.emoteTimer--;
+  });
+
+  // 3. TETHER ROPE CONSTRAINT (Level 4)
+  if (tetherConfig.active && !players[0].inDoor && !players[1].inDoor) {
+    const p1 = players[0];
+    const p2 = players[1];
+    const cx1 = p1.x + p1.w / 2;
+    const cy1 = p1.y + p1.h / 2;
+    const cx2 = p2.x + p2.w / 2;
+    const cy2 = p2.y + p2.h / 2;
+    const dx = cx2 - cx1;
+    const dy = cy2 - cy1;
+    const dist = Math.hypot(dx, dy);
+    if (dist > tetherConfig.length) {
+      const pull = (dist - tetherConfig.length) * 0.045;
+      const nx = dx / dist;
+      const ny = dy / dist;
+      p1.vx += nx * pull;
+      p1.vy += ny * pull;
+      p2.vx -= nx * pull;
+      p2.vy -= ny * pull;
+    }
+  }
+
+  // 4. CO-OP BLOCK PUSHING & BLOCK PHYSICS
+  const solids = getSolidObstacles();
+
+  blocks.forEach(bl => {
+    bl.pushersRight = 0;
+    bl.pushersLeft = 0;
+
+    players.forEach((p, idx) => {
+      if (p.inDoor) return;
+      const other = players[1 - idx];
+      const vOverlap = p.y + p.h > bl.y + 4 && p.y < bl.y + bl.h - 4;
+
+      // Pushing right into block's left face
+      if (vOverlap && p.vx > 0.5 && Math.abs((p.x + p.w) - bl.x) <= 10) {
+        bl.pushersRight++;
+        p.pushingBlock = true;
+        // Partner pushing from behind OR standing on top & holding right!
+        const behindPush = !other.inDoor && other.vx > 0.5 && Math.abs((other.x + other.w) - p.x) <= 12 && Math.abs(other.y - p.y) < 35;
+        const stackedPush = !other.inDoor && other.standingOnPlayer === p.idx && other.vx > 0.5;
+        if (behindPush || stackedPush) {
+          bl.pushersRight++;
+          other.pushingBlock = true;
+        }
+      }
+
+      // Pushing left into block's right face
+      if (vOverlap && p.vx < -0.5 && Math.abs(p.x - (bl.x + bl.w)) <= 10) {
+        bl.pushersLeft++;
+        p.pushingBlock = true;
+        const behindPush = !other.inDoor && other.vx < -0.5 && Math.abs(other.x - (p.x + p.w)) <= 12 && Math.abs(other.y - p.y) < 35;
+        const stackedPush = !other.inDoor && other.standingOnPlayer === p.idx && other.vx < -0.5;
+        if (behindPush || stackedPush) {
+          bl.pushersLeft++;
+          other.pushingBlock = true;
+        }
+      }
+    });
+
+    // Clamp to max 2
+    bl.pushersRight = Math.min(2, bl.pushersRight);
+    bl.pushersLeft = Math.min(2, bl.pushersLeft);
+
+    if (bl.pushersRight >= bl.req) {
+      bl.vx = 2.3;
+    } else if (bl.pushersLeft >= bl.req) {
+      bl.vx = -2.3;
+    } else {
+      bl.vx = 0;
+      if (bl.pushersRight > 0 || bl.pushersLeft > 0) {
+        players.forEach(p => { if (p.pushingBlock) p.sweating = true; });
+      }
+    }
+
+    // Move block X
+    bl.x += bl.vx;
+    solids.forEach(s => {
+      if (rectOverlap(bl, s)) {
+        if (bl.vx > 0) bl.x = s.x - bl.w;
+        else if (bl.vx < 0) bl.x = s.x + s.w;
+        bl.vx = 0;
+      }
+    });
+
+    // Move block Y (Gravity)
+    bl.vy = Math.min(bl.vy + GRAVITY, 12);
+    bl.y += bl.vy;
+    solids.forEach(s => {
+      if (rectOverlap(bl, s)) {
+        if (bl.vy > 0) {
+          bl.y = s.y - bl.h;
+          bl.vy = 0;
+        } else if (bl.vy < 0) {
+          bl.y = s.y + s.h;
+          bl.vy = 0;
+        }
+      }
+    });
+  });
+
+  // 5. MOVE PLAYERS HORIZONTALLY & VERTICALLY
+  const allStaticAndBlocks = [...solids, ...blocks];
+  const dxMoved = [0, 0];
+
+  players.forEach((p, idx) => {
+    if (p.inDoor) return;
+    const startX = p.x;
+    p.x += p.vx;
+
+    // Collide with walls, movers, blocks
+    allStaticAndBlocks.forEach(s => {
+      if (rectOverlap(p, s)) {
+        if (p.vx > 0) p.x = s.x - p.w;
+        else if (p.vx < 0) p.x = s.x + s.w;
+      }
+    });
+
+    // Horizontal player-vs-player collision (when at same height)
+    const other = players[1 - idx];
+    if (!other.inDoor && rectOverlap(p, other)) {
+      const verticalOverlap = Math.min(p.y + p.h, other.y + other.h) - Math.max(p.y, other.y);
+      if (verticalOverlap > 10) {
+        if (p.x < other.x) p.x = other.x - p.w;
+        else p.x = other.x + other.w;
+      }
+    }
+
+    dxMoved[idx] = p.x - startX;
+  });
+
+  // Carry head-riding partner horizontally!
+  players.forEach((p, idx) => {
+    if (p.inDoor) return;
+    if (p.standingOnPlayer !== null) {
+      const carrierIdx = p.standingOnPlayer;
+      const carryDx = dxMoved[carrierIdx];
+      if (carryDx !== 0) {
+        p.x += carryDx;
+        allStaticAndBlocks.forEach(s => {
+          if (rectOverlap(p, s)) {
+            if (carryDx > 0) p.x = s.x - p.w;
+            else if (carryDx < 0) p.x = s.x + s.w;
+          }
+        });
+      }
+    }
+  });
+
+  // Vertical movement & Head-Stacking
+  players.forEach((p, idx) => {
+    if (p.inDoor) return;
+    p.y += p.vy;
+    p.onGround = false;
+    p.standingOnPlayer = null;
+
+    allStaticAndBlocks.forEach(s => {
+      if (rectOverlap(p, s)) {
+        if (p.vy > 0) {
+          p.y = s.y - p.h;
+          p.vy = 0;
+          p.onGround = true;
+        } else if (p.vy < 0) {
+          p.y = s.y + s.h;
+          p.vy = 0;
+        }
+      }
+    });
+
+    // Check landing on the other player's head!
+    const other = players[1 - idx];
+    if (!other.inDoor && rectOverlap(p, other)) {
+      if (p.vy >= 0 && (p.y + p.h - p.vy) <= other.y + 12) {
+        p.y = other.y - p.h;
+        p.vy = other.vy;
+        p.onGround = true;
+        p.standingOnPlayer = other.idx;
+      } else if (p.vy < 0 && p.y >= other.y + other.h - 14) {
+        p.y = other.y + other.h;
+        p.vy = 0;
+      }
+    }
+
+    // Check falling into abyss -> Reset level
+    if (p.y > H + 40) {
+      playSFX('dead');
+      if (netMode === 'host' && isNetworkConnected()) networkSend({ type: 'sfx', sfx: 'dead' });
+      loadLevel(currentLevelIdx, false);
+    }
+  });
+
+  // 6. KEY & DOOR LOGIC
+  keyItem.floatTick += 0.08;
+  if (keyItem.carrierIdx === -1 && !keyItem.used) {
+    keyItem.y = keyItem.baseY + Math.sin(keyItem.floatTick) * 5;
+    const keyBox = { x: keyItem.x - 14, y: keyItem.y - 14, w: 28, h: 28 };
+    players.forEach(p => {
+      if (!p.inDoor && rectOverlap(p, keyBox)) {
+        keyItem.carrierIdx = p.idx;
+        playSFX('key');
+        if (netMode === 'host' && isNetworkConnected()) networkSend({ type: 'sfx', sfx: 'key' });
+        spawnConfetti(keyItem.x, keyItem.y, 14);
+      }
+    });
+  } else if (keyItem.carrierIdx !== -1 && !keyItem.used) {
+    const carrier = players[keyItem.carrierIdx];
+    const targetX = carrier.x + carrier.w / 2 - carrier.facing * 30;
+    const targetY = carrier.y + 10 + Math.sin(keyItem.floatTick) * 3;
+    keyItem.x += (targetX - keyItem.x) * 0.22;
+    keyItem.y += (targetY - keyItem.y) * 0.22;
+  }
+
+  // Unlock door when key carrier touches door
+  players.forEach(p => {
+    if (p.inDoor) return;
+    if (rectOverlap(p, door)) {
+      if (!door.unlocked && keyItem.carrierIdx === p.idx) {
+        door.unlocked = true;
+        keyItem.used = true;
+        playSFX('unlock');
+        if (netMode === 'host' && isNetworkConnected()) networkSend({ type: 'sfx', sfx: 'unlock' });
+        spawnConfetti(door.x + door.w / 2, door.y + door.h / 2, 24);
+      }
+      if (door.unlocked && p.onGround) {
+        p.inDoor = true;
+        spawnConfetti(p.x + p.w / 2, p.y + p.h / 2, 16);
+      }
+    }
+  });
+
+  if (door.unlocked && door.openProgress < 1) {
+    door.openProgress = Math.min(1, door.openProgress + 0.08);
+  }
+
+  // Check if both players are inside the door
+  if (players[0].inDoor && players[1].inDoor && levelClearTimer === 0) {
+    levelClearTimer = 1;
+    playSFX('win');
+    if (netMode === 'host' && isNetworkConnected()) networkSend({ type: 'sfx', sfx: 'win' });
+    spawnConfetti(door.x + 25, door.y + 20, 45);
+  }
+
+  updateParticles();
+
+  if (netMode === 'host') {
+    hostStateTick++;
+    if (hostStateTick % 2 === 0) {
+      sendHostState();
+    }
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const pt = particles[i];
+    pt.x += pt.vx;
+    pt.y += pt.vy;
+    pt.rot += pt.vrot;
+    pt.vy += pt.shape === 'circle' ? 0.05 : 0.22;
+    pt.vx *= 0.98;
+    pt.life--;
+    if (pt.life <= 0) particles.splice(i, 1);
+  }
+}
+
+// ==========================================
+// 8. NETWORK STATE SERIALIZATION
+// ==========================================
+function sendHostState() {
+  if (!isNetworkConnected()) return;
+  networkSend({
+    type: 'state',
+    lvl: currentLevelIdx,
+    clearTimer: levelClearTimer,
+    allWon: allGameWon,
+    p: players.map(p => ({
+      x: Math.round(p.x * 10) / 10,
+      y: Math.round(p.y * 10) / 10,
+      f: p.facing,
+      wf: Math.round(p.walkFrame * 10) / 10,
+      sw: p.sweating,
+      inD: p.inDoor
+    })),
+    bl: blocks.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), pr: b.pushersRight, pl: b.pushersLeft })),
+    bt: buttons.map(b => ({ p: b.pressed, t: b.toggled })),
+    mv: movers.map(m => ({ x: Math.round(m.x), y: Math.round(m.y) })),
+    k: { x: Math.round(keyItem.x), y: Math.round(keyItem.y), c: keyItem.carrierIdx, u: keyItem.used },
+    d: { u: door.unlocked, o: door.openProgress }
+  });
+}
+
+function applyHostState(s) {
+  if (s.lvl !== currentLevelIdx) {
+    loadLevel(s.lvl, false);
+  }
+  levelClearTimer = s.clearTimer;
+  allGameWon = s.allWon;
+  s.p.forEach((sp, i) => {
+    if (!players[i]) return;
+    players[i].targetX = sp.x;
+    players[i].targetY = sp.y;
+    players[i].facing = sp.f;
+    players[i].walkFrame = sp.wf;
+    players[i].sweating = sp.sw;
+    players[i].inDoor = sp.inD;
+    // Snap directly on large displacements (spawn, level load)
+    if (Math.hypot(players[i].x - sp.x, players[i].y - sp.y) > 85) {
+      players[i].x = sp.x;
+      players[i].y = sp.y;
+    }
+    if (players[i].emoteTimer > 0) players[i].emoteTimer--;
+  });
+  s.bl.forEach((sb, i) => {
+    if (!blocks[i]) return;
+    blocks[i].targetX = sb.x;
+    blocks[i].targetY = sb.y;
+    blocks[i].pushersRight = sb.pr;
+    blocks[i].pushersLeft = sb.pl;
+    if (Math.abs(blocks[i].x - sb.x) > 60) {
+      blocks[i].x = sb.x;
+      blocks[i].y = sb.y;
+    }
+  });
+  s.bt.forEach((sbt, i) => {
+    if (!buttons[i]) return;
+    buttons[i].pressed = sbt.p;
+    buttons[i].toggled = sbt.t;
+  });
+  s.mv.forEach((sm, i) => {
+    if (!movers[i]) return;
+    movers[i].targetX = sm.x;
+    movers[i].targetY = sm.y;
+    if (Math.hypot(movers[i].x - sm.x, movers[i].y - sm.y) > 50) {
+      movers[i].x = sm.x;
+      movers[i].y = sm.y;
+    }
+  });
+  keyItem.targetX = s.k.x;
+  keyItem.targetY = s.k.y;
+  keyItem.carrierIdx = s.k.c;
+  keyItem.used = s.k.u;
+  door.unlocked = s.d.u;
+  door.openProgress = s.d.o;
+}
+
+// ==========================================
+// 9. RENDERING (Pico Park Cute Aesthetics)
+// ==========================================
+function drawRoundedRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawStar(cx, cy, spikes, outerRadius, innerRadius, fillStyle) {
+  let rot = Math.PI / 2 * 3;
+  let x = cx;
+  let y = cy;
+  const step = Math.PI / spikes;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - outerRadius);
+  for (let i = 0; i < spikes; i++) {
+    x = cx + Math.cos(rot) * outerRadius;
+    y = cy + Math.sin(rot) * outerRadius;
+    ctx.lineTo(x, y);
+    rot += step;
+
+    x = cx + Math.cos(rot) * innerRadius;
+    y = cy + Math.sin(rot) * innerRadius;
+    ctx.lineTo(x, y);
+    rot += step;
+  }
+  ctx.lineTo(cx, cy - outerRadius);
+  ctx.closePath();
+  ctx.fillStyle = fillStyle;
+  ctx.fill();
+  ctx.restore();
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+
+  // 1. GORGEOUS SOFT AMBIENT BACKGROUND
+  const bgGrad = ctx.createRadialGradient(W / 2, H / 2 - 30, 90, W / 2, H / 2, 620);
+  bgGrad.addColorStop(0, '#FFFDF8');
+  bgGrad.addColorStop(1, '#F3EFE0');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle clean dot grid pattern
+  ctx.fillStyle = 'rgba(41, 50, 65, 0.055)';
+  for (let gx = 24; gx < W; gx += 32) {
+    for (let gy = 24; gy < H; gy += 32) {
+      ctx.beginPath();
+      ctx.arc(gx, gy, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Soft Vignette framing border
+  ctx.strokeStyle = 'rgba(41, 50, 65, 0.04)';
+  ctx.lineWidth = 16;
+  ctx.strokeRect(8, 8, W - 16, H - 16);
+
+  // Level Banner Text at Top
+  const lvl = LEVELS[currentLevelIdx];
+  ctx.save();
+  ctx.fillStyle = 'rgba(41, 50, 65, 0.9)';
+  ctx.font = '900 19px "Segoe UI", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(lvl.name, 44, 48);
+  ctx.fillStyle = '#64748B';
+  ctx.font = '700 13px "Segoe UI", sans-serif';
+  ctx.fillText(lvl.subtitle, 44, 69);
+  ctx.restore();
+
+  // 2. MOVER GUIDE RAILS (Background lines for moving platforms)
+  movers.forEach(m => {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(m.idleX + m.w / 2, m.idleY + m.h / 2);
+    ctx.lineTo(m.activeX + m.w / 2, m.activeY + m.h / 2);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // 3. DRAW GOAL DOOR (Whimsical Vault Portal)
+  ctx.save();
+  // Outer frame shadow
+  ctx.fillStyle = 'rgba(41, 50, 65, 0.14)';
+  ctx.beginPath();
+  ctx.ellipse(door.x + door.w / 2, door.y + door.h + 2, door.w / 2 + 8, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Outer arch border
+  ctx.fillStyle = '#293241';
+  drawRoundedRect(door.x - 5, door.y - 7, door.w + 10, door.h + 9, 12);
+  ctx.fill();
+
+  // Inner frame highlight
+  ctx.fillStyle = '#475569';
+  drawRoundedRect(door.x - 2, door.y - 4, door.w + 4, door.h + 5, 9);
+  ctx.fill();
+
+  // Glowing portal chamber
+  const doorLight = ctx.createLinearGradient(door.x, door.y, door.x, door.y + door.h);
+  if (door.unlocked) {
+    doorLight.addColorStop(0, '#FEF08A');
+    doorLight.addColorStop(0.5, '#FDE047');
+    doorLight.addColorStop(1, '#CA8A04');
+  } else {
+    doorLight.addColorStop(0, '#334155');
+    doorLight.addColorStop(1, '#1E293B');
+  }
+  ctx.fillStyle = doorLight;
+  drawRoundedRect(door.x, door.y, door.w, door.h, 7);
+  ctx.fill();
+
+  // Sliding door panel with metallic bevel
+  const slideW = door.w * (1 - door.openProgress * 0.9);
+  if (slideW > 1) {
+    const doorSlabGrad = ctx.createLinearGradient(door.x, door.y, door.x + slideW, door.y);
+    doorSlabGrad.addColorStop(0, door.unlocked ? '#10B981' : '#64748B');
+    doorSlabGrad.addColorStop(1, door.unlocked ? '#059669' : '#475569');
+    ctx.fillStyle = doorSlabGrad;
+    drawRoundedRect(door.x, door.y, slideW, door.h, 6);
+    ctx.fill();
+
+    // Door grooves
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.fillRect(door.x + 6, door.y + 8, Math.max(0, slideW - 12), door.h - 16);
+  }
+
+  // Goal header badge
+  const badgeY = door.y - 14;
+  ctx.fillStyle = door.unlocked ? '#10B981' : '#293241';
+  drawRoundedRect(door.x + door.w / 2 - 34, badgeY - 10, 68, 20, 6);
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 11px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(door.unlocked ? 'MASUK! ➔' : '🔒 KUNCI', door.x + door.w / 2, badgeY + 4);
+  ctx.restore();
+
+  // 4. DRAW WALLS & GROUND PLATFORMS (Tactile Pico Park Brick Aesthetic)
+  walls.forEach(w => {
+    ctx.save();
+    // Drop shadow under bottom of walls
+    ctx.fillStyle = 'rgba(41, 50, 65, 0.12)';
+    ctx.fillRect(w.x + 2, w.y + w.h, w.w - 4, 5);
+
+    // Wall main coral gradient
+    const wallGrad = ctx.createLinearGradient(w.x, w.y, w.x, w.y + w.h);
+    wallGrad.addColorStop(0, '#FF7A59');
+    wallGrad.addColorStop(1, '#E25B3A');
+    ctx.fillStyle = wallGrad;
+    drawRoundedRect(w.x, w.y, w.w, w.h, 6);
+    ctx.fill();
+
+    // Top edge highlight lip
+    ctx.fillStyle = '#FFA187';
+    ctx.fillRect(w.x + 2, w.y + 2, w.w - 4, 4);
+
+    // Soft brick seams
+    ctx.strokeStyle = 'rgba(41, 50, 65, 0.2)';
+    ctx.lineWidth = 1.5;
+    for (let bx = w.x + 36; bx < w.x + w.w - 10; bx += 36) {
+      ctx.beginPath();
+      ctx.moveTo(bx, w.y + 6);
+      ctx.lineTo(bx, w.y + w.h - 4);
+      ctx.stroke();
+    }
+
+    // Bold crisp outer outline
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 3;
+    drawRoundedRect(w.x, w.y, w.w, w.h, 6);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // 5. DRAW MOVERS (Elevators / Moving Bridges)
+  movers.forEach(m => {
+    ctx.save();
+    // Platform drop shadow
+    ctx.fillStyle = 'rgba(41, 50, 65, 0.16)';
+    ctx.fillRect(m.x + 2, m.y + m.h, m.w - 4, 4);
+
+    // Mover base
+    ctx.fillStyle = m.color || '#8B5CF6';
+    drawRoundedRect(m.x, m.y, m.w, m.h, 6);
+    ctx.fill();
+
+    // Warning hazard diagonal stripes
+    ctx.save();
+    ctx.beginPath();
+    drawRoundedRect(m.x, m.y, m.w, m.h, 6);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 5;
+    for (let sx = -20; sx < m.w + 20; sx += 14) {
+      ctx.beginPath();
+      ctx.moveTo(m.x + sx, m.y);
+      ctx.lineTo(m.x + sx + 10, m.y + m.h);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // LED status dots on sides
+    const ledColor = m.active ? '#10B981' : '#F59E0B';
+    ctx.fillStyle = ledColor;
+    ctx.beginPath();
+    ctx.arc(m.x + 8, m.y + m.h / 2, 3.5, 0, Math.PI * 2);
+    ctx.arc(m.x + m.w - 8, m.y + m.h / 2, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 3;
+    drawRoundedRect(m.x, m.y, m.w, m.h, 6);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // 6. DRAW BUTTONS (3D Tactile Spring Switches)
+  buttons.forEach(b => {
+    ctx.save();
+    const isAct = b.pressed || b.toggled;
+    const bh = isAct ? 6 : b.h;
+    const by = b.y + (b.h - bh);
+
+    // Button base plate
+    ctx.fillStyle = '#1E293B';
+    drawRoundedRect(b.x - 5, b.y + b.h - 4, b.w + 10, 6, 3);
+    ctx.fill();
+
+    // Spring cylinder
+    ctx.fillStyle = '#64748B';
+    ctx.fillRect(b.x + 4, by + 4, b.w - 8, Math.max(0, b.y + b.h - by - 4));
+
+    // Button top cap with bevel
+    const capGrad = ctx.createLinearGradient(b.x, by, b.x, by + bh);
+    capGrad.addColorStop(0, b.color);
+    capGrad.addColorStop(1, '#D97706');
+    ctx.fillStyle = capGrad;
+    drawRoundedRect(b.x, by, b.w, bh, 5);
+    ctx.fill();
+
+    // Highlight sheen
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.fillRect(b.x + 4, by + 2, b.w - 8, Math.max(1, bh * 0.4));
+
+    // Outer outline
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 2.5;
+    drawRoundedRect(b.x, by, b.w, bh, 5);
+    ctx.stroke();
+
+    if (isAct) {
+      // Glow aura
+      ctx.fillStyle = b.color + '33';
+      ctx.beginPath();
+      ctx.arc(b.x + b.w / 2, by + bh / 2, b.w * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  });
+
+  // 7. DRAW HEAVY PUSH BLOCKS (Stylized Wooden Toy Crate with Bolts)
+  blocks.forEach(bl => {
+    ctx.save();
+    // Drop shadow under block
+    ctx.fillStyle = 'rgba(41, 50, 65, 0.16)';
+    ctx.beginPath();
+    ctx.ellipse(bl.x + bl.w / 2, bl.y + bl.h + 3, bl.w / 2 - 2, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Main block gradient
+    const blGrad = ctx.createLinearGradient(bl.x, bl.y, bl.x, bl.y + bl.h);
+    blGrad.addColorStop(0, '#FFE082');
+    blGrad.addColorStop(1, '#FFCA28');
+    ctx.fillStyle = blGrad;
+    drawRoundedRect(bl.x, bl.y, bl.w, bl.h, 10);
+    ctx.fill();
+
+    // Top bevel highlight
+    ctx.fillStyle = '#FFF8E1';
+    ctx.fillRect(bl.x + 4, bl.y + 3, bl.w - 8, 5);
+
+    // Inner panel
+    ctx.fillStyle = '#FFB300';
+    drawRoundedRect(bl.x + 8, bl.y + 8, bl.w - 16, bl.h - 16, 6);
+    ctx.fill();
+
+    // 4 Corner Metal Rivets / Bolts
+    ctx.fillStyle = '#293241';
+    const corners = [
+      [bl.x + 13, bl.y + 13],
+      [bl.x + bl.w - 13, bl.y + 13],
+      [bl.x + 13, bl.y + bl.h - 13],
+      [bl.x + bl.w - 13, bl.y + bl.h - 13]
+    ];
+    corners.forEach(([cx, cy]) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Push calculation & Badge
+    const curPush = Math.max(bl.pushersLeft || 0, bl.pushersRight || 0);
+    const remaining = Math.max(0, bl.req - curPush);
+    const isMoving = remaining === 0;
+
+    // Center circular badge
+    ctx.fillStyle = isMoving ? '#10B981' : '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(bl.x + bl.w / 2, bl.y + bl.h / 2 - 3, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.fillStyle = isMoving ? '#FFFFFF' : '#293241';
+    ctx.font = '900 24px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isMoving ? '✓' : String(remaining), bl.x + bl.w / 2, bl.y + bl.h / 2 - 2);
+
+    ctx.font = '900 10px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#293241';
+    ctx.fillText('DORONG', bl.x + bl.w / 2, bl.y + bl.h - 11);
+    ctx.textBaseline = 'alphabetic';
+
+    // Outer bold border
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 3.5;
+    drawRoundedRect(bl.x, bl.y, bl.w, bl.h, 10);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // 8. DRAW TETHER ROPE (Level 4 Physics Cable)
+  if (tetherConfig.active && !players[0].inDoor && !players[1].inDoor) {
+    const p1 = players[0];
+    const p2 = players[1];
+    const x1 = p1.x + p1.w / 2;
+    const y1 = p1.y + p1.h / 2;
+    const x2 = p2.x + p2.w / 2;
+    const y2 = p2.y + p2.h / 2;
+    const dist = Math.hypot(x2 - x1, y2 - y1);
+    const slack = Math.max(0, (tetherConfig.length - dist) * 0.28);
+    const nearLimit = dist > tetherConfig.length * 0.92;
+
+    ctx.save();
+    // Shadow under rope
+    ctx.beginPath();
+    ctx.moveTo(x1, y1 + 5);
+    ctx.quadraticCurveTo((x1 + x2) / 2, (y1 + y2) / 2 + slack + 5, x2, y2 + 5);
+    ctx.strokeStyle = 'rgba(41, 50, 65, 0.15)';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+
+    // Main cable
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo((x1 + x2) / 2, (y1 + y2) / 2 + slack, x2, y2);
+    ctx.strokeStyle = nearLimit ? '#EF4444' : '#293241';
+    ctx.lineWidth = 4.5;
+    ctx.setLineDash([7, 4]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 9. DRAW FLOATING KEY (Golden Metallic Shine with Sparkles)
+  if (!keyItem.used) {
+    ctx.save();
+    ctx.translate(keyItem.x, keyItem.y);
+
+    // Glowing halo
+    const halo = ctx.createRadialGradient(0, 0, 4, 0, 0, 22);
+    halo.addColorStop(0, 'rgba(253, 224, 71, 0.55)');
+    halo.addColorStop(1, 'rgba(253, 224, 71, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Key shadow
+    ctx.fillStyle = 'rgba(41, 50, 65, 0.15)';
+    ctx.beginPath();
+    ctx.ellipse(0, 24, 12, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Key bow (golden ring)
+    const keyGrad = ctx.createLinearGradient(-10, -10, 10, 10);
+    keyGrad.addColorStop(0, '#FDE047');
+    keyGrad.addColorStop(1, '#D97706');
+    ctx.fillStyle = keyGrad;
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 2.5;
+
+    ctx.beginPath();
+    ctx.arc(-6, 0, 8.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Key inner hole
+    ctx.fillStyle = '#FFFDF7';
+    ctx.beginPath();
+    ctx.arc(-6, 0, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Key stem & teeth
+    ctx.fillStyle = keyGrad;
+    ctx.fillRect(2, -3.5, 15, 7);
+    ctx.strokeRect(2, -3.5, 15, 7);
+    ctx.fillRect(11, 3.5, 5, 5);
+    ctx.strokeRect(11, 3.5, 5, 5);
+
+    // Sparkle star near key
+    const spX = Math.cos(keyItem.floatTick * 2) * 16;
+    const spY = Math.sin(keyItem.floatTick * 2) * 14;
+    drawStar(spX, spY, 4, 4.5, 1.8, '#FEF08A');
+    ctx.restore();
+  }
+
+  // 10. DRAW CHARACTERS (Authentic Cute Pico Park Cats)
+  players.forEach(p => {
+    if (p.inDoor) return;
+    ctx.save();
+
+    // Ground contact shadow
+    ctx.fillStyle = 'rgba(41, 50, 65, 0.18)';
+    ctx.beginPath();
+    ctx.ellipse(p.x + p.w / 2, p.y + p.h - 1, p.w / 2 - 2, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Squash & Stretch Animation based on jump / fall velocity
+    let sx = 1;
+    let sy = 1;
+    if (!p.onGround) {
+      sy = 1 + Math.abs(p.vy) * 0.015;
+      sx = 1 / sy;
+    }
+
+    ctx.translate(p.x + p.w / 2, p.y + p.h);
+    ctx.scale(sx, sy);
+    ctx.translate(-(p.x + p.w / 2), -(p.y + p.h));
+
+    const legBob = Math.sin(p.walkFrame) * 4;
+
+    // Cat Wagging Tail (at back side)
+    const tailDir = -p.facing;
+    const tailWiggle = Math.sin(p.walkFrame * 1.5) * 4;
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(p.x + p.w / 2 + tailDir * 14, p.y + p.h - 14);
+    ctx.quadraticCurveTo(
+      p.x + p.w / 2 + tailDir * 24 + tailWiggle,
+      p.y + p.h - 22,
+      p.x + p.w / 2 + tailDir * 26,
+      p.y + p.h - 30
+    );
+    ctx.stroke();
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Cat Ears
+    const earY = p.y;
+    // Left Ear Outer
+    ctx.fillStyle = p.color;
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 3, earY + 8);
+    ctx.lineTo(p.x + 5, earY - 8);
+    ctx.lineTo(p.x + 16, earY + 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Left Ear Inner (Pink kawaii)
+    ctx.fillStyle = '#FFAAA6';
+    ctx.beginPath();
+    ctx.moveTo(p.x + 6, earY + 6);
+    ctx.lineTo(p.x + 7, earY - 4);
+    ctx.lineTo(p.x + 13, earY + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Right Ear Outer
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.moveTo(p.x + p.w - 3, earY + 8);
+    ctx.lineTo(p.x + p.w - 5, earY - 8);
+    ctx.lineTo(p.x + p.w - 16, earY + 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Right Ear Inner
+    ctx.fillStyle = '#FFAAA6';
+    ctx.beginPath();
+    ctx.moveTo(p.x + p.w - 6, earY + 6);
+    ctx.lineTo(p.x + p.w - 7, earY - 4);
+    ctx.lineTo(p.x + p.w - 13, earY + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Main Body Capsule with 3D gradient
+    const bodyGrad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.h);
+    bodyGrad.addColorStop(0, p.color);
+    bodyGrad.addColorStop(1, p.darkColor);
+    ctx.fillStyle = bodyGrad;
+    drawRoundedRect(p.x, p.y, p.w, p.h - 6, 12);
+    ctx.fill();
+
+    // Forehead highlight gleam
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.beginPath();
+    ctx.ellipse(p.x + p.w / 2, p.y + 7, p.w / 3, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body Outline
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 3;
+    drawRoundedRect(p.x, p.y, p.w, p.h - 6, 12);
+    ctx.stroke();
+
+    // Feet (Little cat paws)
+    ctx.fillStyle = p.darkColor;
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 2.5;
+
+    const f1Y = p.y + p.h - 6 + (p.vx !== 0 ? legBob : 0);
+    drawRoundedRect(p.x + 5, f1Y, 10, 6, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    const f2Y = p.y + p.h - 6 - (p.vx !== 0 ? legBob : 0);
+    drawRoundedRect(p.x + p.w - 15, f2Y, 10, 6, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    // Blushing Kawaii Cheeks
+    ctx.fillStyle = 'rgba(255, 150, 150, 0.55)';
+    ctx.beginPath();
+    ctx.arc(p.x + 8, p.y + 23, 4, 0, Math.PI * 2);
+    ctx.arc(p.x + p.w - 8, p.y + 23, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Expressive Eyes (Kawaii anime shine)
+    const eyeOffsetX = p.facing * 5;
+    const eyeY = p.y + 16;
+
+    // Eyeballs
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(p.x + p.w / 2 - 7 + eyeOffsetX, eyeY, 5, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(p.x + p.w / 2 + 7 + eyeOffsetX, eyeY, 5, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Pupils
+    ctx.fillStyle = '#1E293B';
+    ctx.beginPath();
+    ctx.arc(p.x + p.w / 2 - 6 + eyeOffsetX * 1.2, eyeY, 3, 0, Math.PI * 2);
+    ctx.arc(p.x + p.w / 2 + 8 + eyeOffsetX * 1.2, eyeY, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Specular highlight sparkle
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(p.x + p.w / 2 - 7 + eyeOffsetX * 1.2, eyeY - 1.5, 1.4, 0, Math.PI * 2);
+    ctx.arc(p.x + p.w / 2 + 7 + eyeOffsetX * 1.2, eyeY - 1.5, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tiny cat mouth (w)
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(p.x + p.w / 2 - 2 + eyeOffsetX * 0.5, eyeY + 8, 2.5, 0, Math.PI);
+    ctx.arc(p.x + p.w / 2 + 2 + eyeOffsetX * 0.5, eyeY + 8, 2.5, 0, Math.PI);
+    ctx.stroke();
+
+    // Player Pill Badge ("1P" / "2P") above head
+    const badgeBg = p.color;
+    ctx.fillStyle = badgeBg;
+    drawRoundedRect(p.x + p.w / 2 - 14, p.y - 20, 28, 16, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#293241';
+    ctx.lineWidth = 2;
+    drawRoundedRect(p.x + p.w / 2 - 14, p.y - 20, 28, 16, 8);
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 11px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.label, p.x + p.w / 2, p.y - 8);
+
+    // Sweat Drops (when pushing heavy co-op block alone)
+    if (p.sweating) {
+      const swX = p.x + (p.facing > 0 ? -8 : p.w + 8);
+      const swY = p.y + 12 + ((Date.now() / 8) % 12);
+      ctx.fillStyle = '#38BDF8';
+      ctx.beginPath();
+      ctx.arc(swX, swY, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#0284C7';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#EF4444';
+      ctx.font = '900 11px "Segoe UI", sans-serif';
+      ctx.fillText('BUTUH 2 ORANG! 💦', p.x + p.w / 2, p.y - 26);
+    }
+
+    // Emote Speech Bubble
+    if (p.emoteTimer > 0 && p.emoteText) {
+      ctx.font = '900 13px "Segoe UI", sans-serif';
+      const tw = ctx.measureText(p.emoteText).width + 20;
+      const bx = p.x + p.w / 2 - tw / 2;
+      const by = p.y - 48;
+      ctx.fillStyle = '#FFFFFF';
+      drawRoundedRect(bx, by, tw, 26, 10);
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#293241';
+      drawRoundedRect(bx, by, tw, 26, 10);
+      ctx.stroke();
+
+      // Little tail triangle under bubble
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.moveTo(p.x + p.w / 2 - 5, by + 26);
+      ctx.lineTo(p.x + p.w / 2, by + 32);
+      ctx.lineTo(p.x + p.w / 2 + 5, by + 26);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#293241';
+      ctx.fillText(p.emoteText, p.x + p.w / 2, by + 18);
+    }
+
+    ctx.restore();
+  });
+
+  // 11. PARTICLES (Rotating Confetti & Star Sparkles)
+  particles.forEach(pt => {
+    ctx.save();
+    ctx.translate(pt.x, pt.y);
+    const alpha = Math.max(0, pt.life / pt.maxLife);
+    ctx.globalAlpha = alpha;
+
+    if (pt.shape === 'star') {
+      drawStar(0, 0, 4, pt.size, pt.size * 0.45, pt.color);
+    } else if (pt.shape === 'circle') {
+      ctx.fillStyle = pt.color;
+      ctx.beginPath();
+      ctx.arc(0, 0, pt.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.rotate(pt.rot);
+      ctx.fillStyle = pt.color;
+      // 3D tumble perspective
+      const scaleX = Math.cos(pt.rot * 1.5);
+      ctx.scale(scaleX, 1);
+      ctx.fillRect(-pt.size / 2, -pt.size / 2, pt.size, pt.size * 0.65);
+    }
+    ctx.restore();
+  });
+
+  // 12. LEVEL CLEAR / VICTORY BANNER
+  if (levelClearTimer > 0 && !allGameWon) {
+    ctx.fillStyle = 'rgba(41, 50, 65, 0.6)';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    drawRoundedRect(W / 2 - 220, H / 2 - 75, 440, 150, 20);
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#293241';
+    drawRoundedRect(W / 2 - 220, H / 2 - 75, 440, 150, 20);
+    ctx.stroke();
+
+    ctx.fillStyle = '#10B981';
+    ctx.font = '900 34px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('STAGE CLEAR! 🎉', W / 2, H / 2 - 12);
+
+    ctx.fillStyle = '#475569';
+    ctx.font = '800 15px "Segoe UI", sans-serif';
+    ctx.fillText('Kerja sama yang hebat! Bersiap ke babak berikutnya...', W / 2, H / 2 + 28);
+    ctx.restore();
+  }
+
+  if (allGameWon) {
+    ctx.fillStyle = 'rgba(41, 50, 65, 0.75)';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.fillStyle = '#FFFDF7';
+    drawRoundedRect(W / 2 - 250, H / 2 - 100, 500, 200, 22);
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#293241';
+    drawRoundedRect(W / 2 - 250, H / 2 - 100, 500, 200, 22);
+    ctx.stroke();
+
+    ctx.fillStyle = '#FF7A29';
+    ctx.font = '900 32px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('👑 TAMAT! KALIAN JUARA! 👑', W / 2, H / 2 - 32);
+
+    ctx.fillStyle = '#293241';
+    ctx.font = '700 16px "Segoe UI", sans-serif';
+    ctx.fillText('Semua 5 Level Pico Park Co-Op berhasil diselesaikan!', W / 2, H / 2 + 10);
+
+    ctx.fillStyle = '#64748B';
+    ctx.font = '700 14px "Segoe UI", sans-serif';
+    ctx.fillText('Tekan [R] atau pilih level di atas untuk bermain lagi.', W / 2, H / 2 + 48);
+    ctx.restore();
+  }
+}
+
+// ==========================================
+// 10. MAIN GAME LOOP (60 FPS)
+// ==========================================
+loadLevel(0, false);
+lobbyModal.classList.remove('hidden'); // Open lobby on launch so users see Room Code options immediately
+
+function gameLoop() {
+  updatePhysics();
+  render();
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

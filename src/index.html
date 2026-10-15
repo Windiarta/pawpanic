@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PAW PANIC! - 2 Player Co-Op Online</title>
+  <link rel="icon" type="image/svg+xml" href="/pawpanic.svg" />
+  <link rel="alternate icon" href="/pawpanic.svg" />
+  <link rel="apple-touch-icon" href="/pawpanic.svg" />
+  <!-- PeerJS Fallback for Standalone P2P WebRTC -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+  <!-- ROOT APP CONTAINER (100vw x 100vh) -->
+  <div class="app-container" id="appContainer">
+
+    <!-- ============================================== -->
+    <!-- 1. FULLSCREEN CONSOLE ARCADE MAIN MENU SCREEN -->
+    <!-- ============================================== -->
+    <div class="arcade-menu-screen" id="mainMenuScreen">
+      <!-- Storytelling Background: Puzzle Platformer World Backdrop -->
+      <div class="arcade-world-backdrop" aria-hidden="true">
+        <!-- Dot-grid gaming texture -->
+        <div class="world-dot-grid"></div>
+
+        <!-- Left World Scene: Stepped platforms, switch & block -->
+        <svg class="world-scene scene-left" viewBox="0 0 360 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Floating platform 1 -->
+          <rect x="20" y="320" width="180" height="24" rx="6" fill="#EE6C4D" fill-opacity="0.18" stroke="#EE6C4D" stroke-opacity="0.3" stroke-width="2"/>
+          <line x1="60" y1="324" x2="60" y2="340" stroke="#EE6C4D" stroke-opacity="0.25" stroke-width="2"/>
+          <line x1="120" y1="324" x2="120" y2="340" stroke="#EE6C4D" stroke-opacity="0.25" stroke-width="2"/>
+          <!-- Floor button on platform 1 -->
+          <rect x="70" y="312" width="40" height="8" rx="3" fill="#10B981" fill-opacity="0.35"/>
+          <!-- Push Block [2] -->
+          <rect x="130" y="270" width="50" height="50" rx="8" fill="#F59E0B" fill-opacity="0.15" stroke="#F59E0B" stroke-opacity="0.35" stroke-width="2"/>
+          <circle x="155" y="295" r="14" fill="#F59E0B" fill-opacity="0.25"/>
+          <text x="155" y="300" text-anchor="middle" font-size="14" font-weight="900" fill="#FFE94D" fill-opacity="0.6" font-family="sans-serif">2</text>
+          <!-- Platform 2 higher -->
+          <rect x="80" y="180" width="160" height="22" rx="6" fill="#2EC4B6" fill-opacity="0.16" stroke="#2EC4B6" stroke-opacity="0.3" stroke-width="2"/>
+          <!-- Golden Key floating -->
+          <g transform="translate(150, 130) scale(0.9)" opacity="0.45">
+            <circle cx="12" cy="12" r="10" stroke="#FFE94D" stroke-width="3" fill="none"/>
+            <rect x="20" y="9" width="16" height="6" rx="2" fill="#FFE94D"/>
+            <rect x="28" y="15" width="5" height="5" fill="#FFE94D"/>
+          </g>
+          <!-- Elastic dashed tether line -->
+          <path d="M 60 310 Q 110 240 140 175" stroke="#EC4899" stroke-width="2.5" stroke-dasharray="6,5" stroke-opacity="0.3" fill="none"/>
+        </svg>
+
+        <!-- Right World Scene: Mover lift, laser gate & exit door -->
+        <svg class="world-scene scene-right" viewBox="0 0 360 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Platform right lower -->
+          <rect x="140" y="340" width="200" height="24" rx="6" fill="#EE6C4D" fill-opacity="0.18" stroke="#EE6C4D" stroke-opacity="0.3" stroke-width="2"/>
+          <!-- Lift Mover with arrows -->
+          <rect x="40" y="260" width="90" height="18" rx="5" fill="#8B5CF6" fill-opacity="0.2" stroke="#8B5CF6" stroke-opacity="0.4" stroke-width="2"/>
+          <path d="M 85 240 L 85 254 M 81 245 L 85 240 L 89 245" stroke="#8B5CF6" stroke-opacity="0.4" stroke-width="2" stroke-linecap="round"/>
+          <!-- Exit Door on upper platform -->
+          <rect x="180" y="160" width="150" height="22" rx="6" fill="#2EC4B6" fill-opacity="0.16" stroke="#2EC4B6" stroke-opacity="0.3" stroke-width="2"/>
+          <rect x="240" y="96" width="46" height="64" rx="8" fill="#1E192B" stroke="#FFE94D" stroke-opacity="0.4" stroke-width="2.5"/>
+          <circle cx="263" cy="128" r="4" fill="#FFE94D" fill-opacity="0.6"/>
+          <!-- Crown on door -->
+          <path d="M 251 90 L 255 82 L 263 87 L 271 82 L 275 90 Z" fill="#FFE94D" fill-opacity="0.5"/>
+          <text x="263" y="112" text-anchor="middle" font-size="8" font-weight="900" fill="#10B981" fill-opacity="0.7" font-family="sans-serif">EXIT</text>
+        </svg>
+
+        <!-- Subtle floating paw prints trail -->
+        <div class="arcade-paws-bg" id="arcadePawsBg" aria-hidden="true">
+          <span class="float-paw paw-1" style="--x:7%; --dur:15s; --delay:0s; --c:#FF7A29; --s:22px;">🐾</span>
+          <span class="float-paw paw-2" style="--x:20%; --dur:19s; --delay:4s; --c:#2EC4B6; --s:18px;">🐾</span>
+          <span class="float-paw paw-3" style="--x:35%; --dur:17s; --delay:8s; --c:#FFD166; --s:24px;">🐾</span>
+          <span class="float-paw paw-4" style="--x:65%; --dur:16s; --delay:2s; --c:#A855F7; --s:20px;">🐾</span>
+          <span class="float-paw paw-5" style="--x:80%; --dur:18s; --delay:6s; --c:#FF6B9D; --s:24px;">🐾</span>
+          <span class="float-paw paw-6" style="--x:93%; --dur:20s; --delay:10s; --c:#38BDF8; --s:18px;">🐾</span>
+        </div>
+      </div>
+
+      <!-- Main Central Container: Clustered without empty vertical gap -->
+      <div class="arcade-main-wrapper">
+
+        <!-- Top Title Branding -->
+        <header class="arcade-title-group">
+          <div class="arcade-badge">
+            <span class="badge-paw">🐾</span>
+            <span>2-PLAYER CO-OP ARCADE PARTY</span>
+            <span class="badge-paw">🐾</span>
+          </div>
+          <h1 class="arcade-logo">
+            <span class="logo-paw-bounce logo-paw-left">🐾</span>
+            <img src="/pawpanic.svg" class="arcade-logo-icon" alt="Paw" />
+            <span class="logo-text">PAW PANIC!</span>
+            <span class="logo-paw-bounce logo-paw-right">🐾</span>
+          </h1>
+          <p class="arcade-subtitle">
+            <span>🐾 2-Player Cooperative Cat Puzzle Game • 100 Levels 🐾</span>
+          </p>
+        </header>
+
+        <!-- 3-COLUMN MAIN LAYOUT (Left Side • Center Stage & Actions • Right Side) -->
+        <div class="arcade-menu-layout">
+
+          <!-- LEFT PANEL: QUICK CONTROLS & TIPS -->
+          <aside class="arcade-side-card arcade-side-left">
+            <div class="side-card-header">
+              <span class="side-card-icon">🎮</span>
+              <div>
+                <h3>QUICK CONTROLS</h3>
+                <small>2-Player Keyboard</small>
+              </div>
+            </div>
+
+            <div class="side-card-section">
+              <div class="player-control-badge p1-badge">
+                <span class="control-dot p1-dot"></span>
+                <strong>PLAYER 1 (P1)</strong>
+              </div>
+              <div class="key-combo-row">
+                <span class="key-badge">A</span>
+                <span class="key-badge">D</span>
+                <span class="key-desc">Move Left / Right</span>
+              </div>
+              <div class="key-combo-row">
+                <span class="key-badge">W</span>
+                <span class="key-sep">/</span>
+                <span class="key-badge space-key">Space</span>
+                <span class="key-desc">Jump</span>
+              </div>
+            </div>
+
+            <div class="side-card-section">
+              <div class="player-control-badge p2-badge">
+                <span class="control-dot p2-dot"></span>
+                <strong>PLAYER 2 (P2)</strong>
+              </div>
+              <div class="key-combo-row">
+                <span class="key-badge">◀</span>
+                <span class="key-badge">▶</span>
+                <span class="key-desc">Move Left / Right</span>
+              </div>
+              <div class="key-combo-row">
+                <span class="key-badge">▲</span>
+                <span class="key-desc">Jump</span>
+              </div>
+            </div>
+
+            <div class="side-card-section shortcut-section">
+              <div class="shortcut-item">
+                <span class="key-badge mini-key">R</span>
+                <span>Restart Level</span>
+              </div>
+              <div class="shortcut-item">
+                <span class="key-badge mini-key">Esc</span>
+                <span>Pause Menu</span>
+              </div>
+              <div class="shortcut-item">
+                <span class="key-badge mini-key">1-4</span>
+                <span>Send Emote</span>
+              </div>
+            </div>
+
+            <div class="side-coop-tip">
+              <span class="tip-paw">💡</span>
+              <span>Jump on your partner's head for high leaps & push [2] blocks together!</span>
+            </div>
+          </aside>
+
+          <!-- CENTER: HERO DUAL CATS STAGE & STRUCTURED MENU -->
+          <main class="arcade-center-panel">
+            <!-- Center Live Animated Cat Avatar Stage (Chunky, Heroic Scale) -->
+            <div class="arcade-character-stage" id="menuCatStage" title="Click cats to jump together!">
+              <canvas id="menuCatCanvas" width="540" height="230"></canvas>
+              <div class="arcade-character-label" id="menuCatLabel">
+                <span class="cat-pill cat-p1-pill" id="menuCatP1Badge">🟠 P1: Classic</span>
+                <span class="cat-heart-pulse">💖</span>
+                <span class="cat-pill cat-p2-pill" id="menuCatP2Badge">🟢 P2: Mint Teal</span>
+              </div>
+            </div>
+
+            <!-- PRIMARY PLAY MODES (Hero 2-Column Cards) -->
+            <div class="primary-play-grid">
+              <button class="hero-play-card card-local" id="btnMenuPlay">
+                <div class="play-card-glow"></div>
+                <div class="play-card-top">
+                  <span class="card-icon">🎮</span>
+                  <span class="card-tag">1 SCREEN CO-OP</span>
+                </div>
+                <div class="play-card-body">
+                  <strong>LOCAL CO-OP</strong>
+                  <small>Play on 1 keyboard with your partner (WAD & Arrows)</small>
+                </div>
+                <div class="play-card-cta">
+                  <span>PLAY NOW</span>
+                  <span class="cta-arrow">▶</span>
+                </div>
+              </button>
+
+              <button class="hero-play-card card-online" id="btnMenuOnline">
+                <div class="play-card-glow"></div>
+                <div class="play-card-top">
+                  <span class="card-icon">🌐</span>
+                  <span class="card-tag tag-online">P2P ROOM</span>
+                </div>
+                <div class="play-card-body">
+                  <strong>ONLINE CO-OP</strong>
+                  <small>Host or join a multiplayer room via internet</small>
+                </div>
+                <div class="play-card-cta cta-online">
+                  <span>ENTER ROOM</span>
+                  <span class="cta-arrow">📡</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- SECONDARY UTILITY ACTIONS (Balanced 3-Button Bar) -->
+            <div class="secondary-actions-bar">
+              <button class="sub-action-btn sub-level" id="btnMenuLevelSelect">
+                <span class="sub-icon">🗺️</span>
+                <span><strong>SELECT LEVEL</strong> (100)</span>
+              </button>
+
+              <button class="sub-action-btn sub-skin" id="btnMenuSkin">
+                <span class="sub-icon">🎨</span>
+                <span><strong>CHANGE SKIN</strong> 🐾</span>
+              </button>
+
+              <button class="sub-action-btn sub-how" id="btnMenuHowToPlay">
+                <span class="sub-icon">📖</span>
+                <span><strong>GUIDE</strong></span>
+              </button>
+            </div>
+          </main>
+
+          <!-- RIGHT PANEL: 100 LEVEL WORLDS & FEATURES -->
+          <aside class="arcade-side-card arcade-side-right">
+            <div class="side-card-header">
+              <span class="side-card-icon">🗺️</span>
+              <div>
+                <h3>100 CHALLENGE LEVELS</h3>
+                <small>5 Challenge Worlds</small>
+              </div>
+            </div>
+
+            <div class="tiers-list">
+              <div class="tier-item">
+                <span class="tier-num">T1</span>
+                <div class="tier-info">
+                  <strong>Friendship Steps</strong>
+                  <small>Lv 1 - 20 • Stacking & Team Leaps</small>
+                </div>
+              </div>
+              <div class="tier-item">
+                <span class="tier-num">T2</span>
+                <div class="tier-info">
+                  <strong>Button Sync</strong>
+                  <small>Lv 21 - 40 • Dual Switches & Timing</small>
+                </div>
+              </div>
+              <div class="tier-item">
+                <span class="tier-num">T3</span>
+                <div class="tier-info">
+                  <strong>Elastic Tether</strong>
+                  <small>Lv 41 - 60 • Distance & Rope Pull</small>
+                </div>
+              </div>
+              <div class="tier-item">
+                <span class="tier-num">T4</span>
+                <div class="tier-info">
+                  <strong>Lifts & Heavy Blocks</strong>
+                  <small>Lv 61 - 80 • Co-Op Push Blocks</small>
+                </div>
+              </div>
+              <div class="tier-item tier-item-crown">
+                <span class="tier-num crown-num">👑</span>
+                <div class="tier-info">
+                  <strong>Master Crown Trial</strong>
+                  <small>Lv 81 - 100 • Extreme Gauntlet</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="side-features-box">
+              <div class="feature-tag"><span>⏱️</span> Speedrun Timer</div>
+              <div class="feature-tag"><span>🎨</span> 16 Colors & 26 Hats</div>
+              <div class="feature-tag"><span>⚡</span> P2P WebRTC & Socket</div>
+            </div>
+          </aside>
+
+        </div>
+
+        <!-- Bottom Arcade Footer Controls -->
+        <footer class="arcade-footer">
+          <div class="arcade-footer-left">
+            <button class="arcade-pill-btn" id="btnMenuSoundToggle">🔊 Sound: ON</button>
+            <button class="arcade-pill-btn" id="btnMenuFsToggle">⛶ Fullscreen</button>
+          </div>
+          <div class="arcade-footer-right">
+            <span class="arcade-version-tag">🐾 v2.0 • Console Party Edition</span>
+          </div>
+        </footer>
+
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 2. GAMEPLAY VIEWPORT & WINDOW -->
+    <!-- ============================================== -->
+    <div class="game-viewport hidden" id="gameViewport">
+      <!-- 16:9 Centered Canvas Stage -->
+      <div class="canvas-stage" id="canvasStage">
+        <canvas id="gameCanvas" width="1920" height="1080"></canvas>
+
+        <!-- FLOATING MINIMALIST IN-GAME HUD -->
+        <div class="floating-hud" id="floatingHud">
+          <!-- Top Left: Level Badge & Speedrun Timer -->
+          <div class="hud-left">
+            <div class="hud-pill hud-level-pill" id="hudLevelBadge">
+              <span class="hud-dot"></span>
+              <span id="hudLevelName">Level 1: Friendship Steps</span>
+            </div>
+            <div class="hud-pill hud-timer-pill" id="hudTimer" title="Level Time">
+              <span>⏱️</span>
+              <span id="timerText">00:00.00</span>
+            </div>
+            <div class="hud-pill hud-conn-pill hidden" id="hudConnBadge">
+              <span class="status-dot" id="connDot"></span>
+              <span id="connText">Online</span>
+            </div>
+          </div>
+
+          <!-- Top Right: Minimalist Floating Actions -->
+          <div class="hud-right">
+            <button class="hud-btn hud-btn-skip" id="btnSkipLevel" title="Skip Level">⏩ Skip Level</button>
+            <button class="hud-btn" id="btnReset" title="Restart Level (R)">🔄 [R]</button>
+            <button class="hud-btn" id="btnPause" title="Pause Game (Esc)">⏸️ [Esc]</button>
+            <button class="hud-btn" id="btnSound" title="Sound">🔊</button>
+            <button class="hud-btn" id="btnFullscreen" title="Fullscreen (F)">⛶</button>
+          </div>
+        </div>
+
+        <!-- HIDDEN LEVEL SELECTOR FOR EVENT ROUTING -->
+        <select class="hidden" id="levelSelect"></select>
+      </div>
+
+      <!-- IN-GAME TOUCH CONTROLS (Mobile / Tablet) -->
+      <div class="touch-controls">
+        <div class="touch-cluster">
+          <button class="touch-btn" id="touchLeft">◀</button>
+          <button class="touch-btn" id="touchRight">▶</button>
+        </div>
+        <div class="touch-cluster">
+          <button class="touch-btn" id="touchEmote" style="font-size:0.9rem; width:64px;">📣</button>
+          <button class="touch-btn jump-btn" id="touchJump">JUMP</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- 3. MODALS (Level Select, Pause, Skin, Lobby, Help) -->
+    <!-- ============================================== -->
+
+    <!-- CANDY CRUSH CAT JOURNEY LEVEL SELECT SCREEN -->
+    <div class="screen-overlay hidden candy-journey-overlay" id="levelSelectScreen">
+      <div class="candy-journey-frame">
+        
+        <!-- TOP CANDY CRUSH HUD BAR -->
+        <header class="candy-top-hud">
+          <div class="candy-hud-left">
+            <button class="candy-hud-icon-btn" id="btnCandyGift" title="Cat Gift Box">
+              <span>🎁</span>
+            </button>
+            <div class="candy-pill candy-pill-lives" title="Paw Power / Cat Lives">
+              <span class="candy-pill-icon">🐟</span>
+              <span class="candy-pill-text"><strong>99+</strong> Fish</span>
+            </div>
+          </div>
+
+          <!-- Center: Cat Avatar Frame -->
+          <div class="candy-hud-center">
+            <div class="candy-avatar-ring">
+              <span class="candy-avatar-cat" id="candyHudCat">🐱</span>
+              <span class="candy-avatar-crown">👑</span>
+            </div>
+            <div class="candy-journey-title-wrap">
+              <h2 class="candy-journey-logo">PAW JOURNEY</h2>
+              <span class="candy-journey-sub" id="candyLevelIndicator">Level 1 • Catnip Garden</span>
+            </div>
+          </div>
+
+          <div class="candy-hud-right">
+            <div class="candy-pill candy-pill-stars" title="Total Stars Cleared">
+              <span class="candy-pill-icon">⭐</span>
+              <span class="candy-pill-text"><strong id="candyTotalStars">0</strong>/100</span>
+            </div>
+            <button class="candy-hud-close-btn" id="btnCloseLevelSelect" title="Close Map">✕</button>
+          </div>
+        </header>
+
+        <!-- WORLD QUICK NAVIGATION TABS (5 BIOMES) -->
+        <nav class="candy-world-ribbon" id="candyWorldTabs">
+          <button class="candy-world-tab active" data-world="1">
+            <span class="world-tab-emoji">🌱</span>
+            <span class="world-tab-name">1. Basics (1-20)</span>
+          </button>
+          <button class="candy-world-tab" data-world="2">
+            <span class="world-tab-emoji">⚙️</span>
+            <span class="world-tab-name">2. Mechanics (21-40)</span>
+          </button>
+          <button class="candy-world-tab" data-world="3">
+            <span class="world-tab-emoji">🔗</span>
+            <span class="world-tab-name">3. Tether Rope (41-60)</span>
+          </button>
+          <button class="candy-world-tab" data-world="4">
+            <span class="world-tab-emoji">⚡</span>
+            <span class="world-tab-name">4. Acrobatics (61-80)</span>
+          </button>
+          <button class="candy-world-tab" data-world="5">
+            <span class="world-tab-emoji">👑</span>
+            <span class="world-tab-name">5. Master (81-100)</span>
+          </button>
+        </nav>
+
+        <!-- SCROLLABLE CANDY MAP JOURNEY CONTAINER -->
+        <main class="candy-map-scroll-area" id="candyMapScroll">
+          <div class="candy-map-canvas" id="candyMapCanvas">
+            <!-- SVG Winding Candy Track Path -->
+            <svg class="candy-track-svg" id="candyTrackSvg" preserveAspectRatio="none">
+              <defs>
+                <pattern id="candyStripes" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <rect width="14" height="28" fill="#FF7A29" />
+                  <rect x="14" width="14" height="28" fill="#2EC4B6" />
+                </pattern>
+                <filter id="trackShadow" x="-10%" y="-10%" width="130%" height="130%">
+                  <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="rgba(41, 50, 65, 0.22)" />
+                </filter>
+              </defs>
+              <!-- Under-border shadow -->
+              <path class="svg-track-border" id="svgTrackBorder" filter="url(#trackShadow)" />
+              <!-- Candy-striped ribbon (P1 Orange & P2 Mint Teal) -->
+              <path class="svg-track-candy" id="svgTrackCandy" />
+              <!-- Glossy inner line -->
+              <path class="svg-track-inner" id="svgTrackInner" />
+            </svg>
+
+            <!-- Decorative Cats & Landmarks will be injected / rendered here -->
+            <div class="candy-landmarks-layer" id="candyLandmarksLayer"></div>
+
+            <!-- 100 Winding Level Nodes -->
+            <div class="candy-nodes-layer" id="candyNodesLayer"></div>
+
+            <!-- Active Player Cat Token Pin -->
+            <div class="candy-player-cat-pin" id="candyPlayerPin">
+              <div class="cat-pin-bubble">YOU ARE HERE! 🐾</div>
+              <div class="cat-pin-body">
+                <span class="cat-pin-ears">🐱</span>
+                <span class="cat-pin-shadow"></span>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- CANDY CRUSH BOTTOM DOCK CONTROLS -->
+        <footer class="candy-bottom-bar">
+          <div class="candy-bottom-left">
+            <button class="candy-dock-btn" id="btnLevelSelectBack">
+              <span class="dock-btn-icon">🏠</span>
+              <span class="dock-btn-label">Main Menu</span>
+            </button>
+          </div>
+
+          <div class="candy-bottom-center">
+            <button class="candy-main-play-btn" id="btnCandyScrollToActive">
+              <span class="main-play-icon">🎯</span>
+              <span class="main-play-text">My Level</span>
+            </button>
+            <button class="candy-dock-btn candy-random-btn" id="btnRandomLevel" title="Select random level">
+              <span class="dock-btn-icon">🎲</span>
+              <span class="dock-btn-label">Random</span>
+            </button>
+          </div>
+
+          <div class="candy-bottom-right">
+            <button class="candy-dock-btn candy-play-current-btn" id="btnLevelSelectPlayCurrent">
+              <span class="dock-btn-icon">▶</span>
+              <span class="dock-btn-label">Play Level</span>
+            </button>
+          </div>
+        </footer>
+
+        <!-- CANDY LEVEL POPUP CARD MODAL -->
+        <div class="candy-level-popup-backdrop hidden" id="candyLevelPopup">
+          <div class="candy-popup-card">
+            <button class="candy-popup-close-btn" id="btnCandyPopupClose">✕</button>
+            
+            <div class="candy-popup-header">
+              <div class="candy-popup-ribbon" id="popupRibbon">LEVEL 1</div>
+              <div class="candy-popup-stars" id="popupStars">
+                <span class="pstar">⭐</span>
+                <span class="pstar">⭐</span>
+                <span class="pstar">⭐</span>
+              </div>
+            </div>
+
+            <div class="candy-popup-body">
+              <div class="candy-popup-cat-banner">
+                <span class="popup-cat-anim" id="popupCatIcon">🐱</span>
+                <span class="popup-candy-icon">🍬</span>
+              </div>
+              <h3 class="candy-popup-title" id="popupTitle">Friendship Steps</h3>
+              <p class="candy-popup-sub" id="popupSubtitle">Jump on your partner's head to reach the key!</p>
+              
+              <div class="candy-popup-chips" id="popupChips"></div>
+
+              <div class="candy-popup-record hidden" id="popupRecordWrap">
+                <span>⏱️ Best Record:</span>
+                <strong id="popupRecordTime">00:15.22</strong>
+              </div>
+            </div>
+
+            <div class="candy-popup-footer">
+              <button class="candy-play-stage-btn" id="btnCandyPopupPlay">
+                <span>▶ PLAY THIS LEVEL</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PERSONALIZE / SKIN STUDIO MODAL (DUAL PLAYER P1 & P2) -->
+    <div class="modal-backdrop hidden" id="skinModal">
+      <div class="skin-card skin-studio-card">
+        <div class="skin-card-header">
+          <div class="skin-header-title-wrap">
+            <span class="skin-header-badge">🎨 CUSTOM STUDIO</span>
+            <h3>CUSTOMIZE CATS & HATS</h3>
+          </div>
+          <button class="btn btn-close" id="btnCloseSkinModal">✕</button>
+        </div>
+
+        <!-- PLAYER SWITCHER TABS (P1 vs P2) -->
+        <div class="skin-player-tabs" id="skinPlayerTabs">
+          <button class="skin-tab-btn active" data-player="1" id="tabSkinP1">
+            <span class="skin-tab-dot p1-dot"></span>
+            <span class="skin-tab-label">🐱 PLAYER 1 (P1)</span>
+            <span class="skin-tab-pill">ACTIVE</span>
+          </button>
+          <button class="skin-tab-btn" data-player="2" id="tabSkinP2">
+            <span class="skin-tab-dot p2-dot"></span>
+            <span class="skin-tab-label">🐱 PLAYER 2 (P2)</span>
+            <span class="skin-tab-pill">ACTIVE</span>
+          </button>
+        </div>
+
+        <!-- STUDIO SPLIT CONTENT -->
+        <div class="skin-studio-split">
+          <!-- LEFT: LIVE SHOWCASE -->
+          <div class="skin-showcase-box">
+            <div class="skin-showcase-pedestal">
+              <canvas id="skinPreviewCanvas" width="160" height="160"></canvas>
+            </div>
+            <div class="skin-showcase-meta">
+              <div class="skin-player-indicator" id="skinPlayerIndicator">Player 1 (P1 - Host)</div>
+              <div class="skin-name-label" id="skinColorName">Classic Orange</div>
+              <div class="skin-hat-label" id="skinHatName">No Hat</div>
+            </div>
+            <div class="skin-showcase-actions">
+              <button class="skin-tool-btn" id="btnRandomSkin" title="Random skin & hat">🎲 Random</button>
+              <button class="skin-tool-btn" id="btnResetDefaultSkin" title="Reset to default">🔄 Default</button>
+            </div>
+          </div>
+
+          <!-- RIGHT: CATALOG TABS & PICKER -->
+          <div class="skin-catalog-pane">
+            <div class="skin-catalog-section">
+              <div class="skin-group-header">
+                <span>🎨 FUR COLOR (16 COLORS)</span>
+              </div>
+              <div class="skin-palette-grid" id="skinPaletteGrid"></div>
+            </div>
+
+            <div class="skin-catalog-section">
+              <div class="skin-group-header">
+                <span>👑 HATS, DRESSES & ACCESSORIES (26 OPTIONS)</span>
+              </div>
+              <div class="skin-accessory-grid" id="skinAccessoryGrid"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="skin-card-footer">
+          <div class="skin-footer-note">💡 P1 & P2 customizations apply to both Local & Online Co-Op!</div>
+          <button class="btn btn-primary btn-save-studio" id="btnSaveSkinModal">💾 Save & Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAUSE MENU MODAL (Esc / Pause) -->
+    <div class="modal-backdrop hidden" id="pauseModal">
+      <div class="pause-card">
+        <div class="pause-header">
+          <div class="pause-badge">GAME PAUSED</div>
+          <h2 class="pause-title">PAW PANIC!</h2>
+        </div>
+        <div class="pause-actions">
+          <button class="btn btn-primary btn-pause" id="btnPauseResume">▶ Resume Game [Esc]</button>
+          <button class="btn btn-skip btn-pause" id="btnPauseSkip">⏩ Skip This Level</button>
+          <button class="btn btn-yellow btn-pause" id="btnPauseReset">🔄 Restart Level [R]</button>
+          <button class="btn btn-pause" id="btnPauseLevelSelect">🗺️ Select Level (1-100)</button>
+          <button class="btn btn-pause" id="btnPauseMainMenu">🏠 Return to Main Menu</button>
+          <button class="btn btn-danger btn-pause hidden" id="btnDisconnect">🔌 Leave Room / Disconnect</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOBBY / MULTIPLAYER MODAL -->
+    <div class="modal-backdrop hidden" id="lobbyModal">
+      <div class="lobby-card">
+        <div class="lobby-header-row">
+          <div class="lobby-title">🐾 2-PLAYER ONLINE CO-OP</div>
+          <button class="btn btn-close" id="btnCloseLobby">✕</button>
+        </div>
+        <div class="lobby-subtitle">Work together to grab the key, push heavy blocks, and reach the exit door!</div>
+
+        <div class="status-log" id="lobbyStatus">
+          Click <b>Create Room Code</b> to host, or enter your friend's code in <b>Join Room</b>.
+        </div>
+
+        <div class="mode-grid">
+          <!-- HOST BOX -->
+          <div class="mode-box">
+            <h3 style="color: var(--p1-dark);">🟠 Player 1 — Host Room</h3>
+            <p>Generate a unique room code and share it with your friend.</p>
+            <div class="room-code-display" id="hostCodeDisplay">----</div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-primary" style="flex:1; justify-content:center;" id="btnCreateRoom">✨ Create Room Code</button>
+              <button class="btn" id="btnCopyCode" title="Copy Code">📋 Copy</button>
+            </div>
+          </div>
+
+          <!-- JOIN BOX -->
+          <div class="mode-box">
+            <h3 style="color: var(--p2-dark);">🟢 Player 2 — Join Room</h3>
+            <p>Enter the 4-character room code from Player 1 to connect.</p>
+            <div class="input-row">
+              <input type="text" id="joinCodeInput" class="code-input" placeholder="CODE" maxlength="8" />
+            </div>
+            <button class="btn btn-secondary" style="width:100%; justify-content:center;" id="btnJoinRoom">🚀 Join Room</button>
+          </div>
+        </div>
+
+        <div class="local-divider">
+          <div style="font-size:0.82rem; font-weight:700; color:#475569; text-align:left;">
+            💡 Want to play together on 1 screen / keyboard?<br/>
+            <span style="font-weight:600; color:#64748B;">P1: <b>W, A, D</b> &nbsp;|&nbsp; P2: <b>Arrow Keys (Up, Left, Right)</b></span>
+          </div>
+          <button class="btn btn-yellow" id="btnPlayLocal">🎮 Play Local</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOW TO PLAY MODAL -->
+    <div class="modal-backdrop hidden" id="howToPlayModal">
+      <div class="how-to-play-card">
+        <div class="how-to-play-header">
+          <h3>📖 HOW TO PLAY PAW PANIC!</h3>
+          <button class="btn btn-close" id="btnCloseHowToPlay">✕</button>
+        </div>
+
+        <div class="how-to-play-body">
+          <div class="guide-item">
+            <div class="guide-icon">🔑</div>
+            <div class="guide-content">
+              <h4>1. Grab Key & Unlock Exit Door</h4>
+              <p>Cooperate to grab the Golden Key and unlock the door. Both cats must enter to clear the level!</p>
+            </div>
+          </div>
+
+          <div class="guide-item">
+            <div class="guide-icon">🐱</div>
+            <div class="guide-content">
+              <h4>2. Stack & Jump on Friend's Head</h4>
+              <p>Jump on top of your partner's head to reach higher ledges neither can reach alone.</p>
+            </div>
+          </div>
+
+          <div class="guide-item">
+            <div class="guide-icon">📦</div>
+            <div class="guide-content">
+              <h4>3. Heavy Push Blocks [2]</h4>
+              <p>Blocks labeled [2] require both players pushing together in the same direction!</p>
+            </div>
+          </div>
+
+          <div class="guide-item">
+            <div class="guide-icon">🔘</div>
+            <div class="guide-content">
+              <h4>4. Switches & Sync Buttons</h4>
+              <p>Red buttons must be held down, green buttons toggle permanently, and blue buttons must be pressed simultaneously.</p>
+            </div>
+          </div>
+
+          <div class="guide-item">
+            <div class="guide-icon">🪢</div>
+            <div class="guide-content">
+              <h4>5. Elastic Tether Rope (Tier 3)</h4>
+              <p>Both cats are tied together! Don't wander too far apart or you will pull each other into pitfalls.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="how-to-play-footer">
+          <button class="btn btn-primary" style="width:100%; justify-content:center;" id="btnGotIt">👍 Got It, Let's Play!</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

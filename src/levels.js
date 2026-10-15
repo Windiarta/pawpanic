@@ -362,7 +362,7 @@ function generate100Levels() {
           color: '#8B5CF6',
           targetId: `mv_${i}`
         });
-        key = { x: (startEdge + endEdge) / 2, y: 410 };
+        key = { x: endEdge + 40, y: 410 };
         door = { x: 840, y: 396 };
 
       } else {
@@ -471,7 +471,7 @@ function generate100Levels() {
           idleY: 540,
           color: '#EC4899'
         });
-        key = { x: (leftW + rightX) / 2, y: 400 };
+        key = { x: rightX + 40, y: 410 };
         door = { x: 840, y: 396 };
 
       } else {

@@ -164,17 +164,18 @@ export function initNetwork(handlers) {
     )
   );
 
-  const defaultRemoteServer = 'https://pawpanic-server.onrender.com';
+  const defaultRemoteServer = ''; // Nonaktif jika tidak ada backend khusus
   const customServer = (typeof window !== 'undefined' && (window.__SOCKET_SERVER__ || localStorage.getItem('pawpanic_server_url')));
 
-  const serverOrigin = customServer || (isLocalhost ? window.location.origin : defaultRemoteServer);
+  const serverOrigin = customServer || (isLocalhost ? window.location.origin : '');
 
-  try {
-    socket = io(serverOrigin, {
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
-      timeout: 5000
-    });
+  if (serverOrigin) {
+    try {
+      socket = io(serverOrigin, {
+        transports: ['websocket', 'polling'],
+        reconnectionAttempts: 5,
+        timeout: 5000
+      });
 
     socket.on('connect', () => {
       setLobbyStatus('⚡ Terhubung ke Game Server (Socket.IO siap). Buat room atau gabung kode!', '#EFF6FF');
@@ -255,6 +256,9 @@ export function initNetwork(handlers) {
   } catch (e) {
     socket = null;
   }
+} else {
+  socket = null;
+}
 
   // Ping interval
   setInterval(() => {
@@ -321,14 +325,18 @@ export function createRoom() {
   if (hostDisplay) hostDisplay.textContent = roomCode;
   setLobbyStatus(`⏳ Setting up room <b>${roomCode}</b> (WebRTC)...`, '#FEF3C7');
 
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
+  ];
+
   peer = new window.Peer(fullPeerId, {
     debug: 1,
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    }
+    config: { iceServers }
   });
 
   peer.on('open', () => {
@@ -385,14 +393,18 @@ export function joinRoom(rawCode) {
   roomCode = rawCode;
   setLobbyStatus(`⏳ Connecting to Room <b>${roomCode}</b> (WebRTC)...`, '#FEF3C7');
 
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' }
+  ];
+
   peer = new window.Peer({
     debug: 1,
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    }
+    config: { iceServers }
   });
 
   peer.on('open', () => {

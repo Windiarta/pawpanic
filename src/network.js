@@ -15,7 +15,8 @@ let onDataCallback = null;
 let onStartGameCallback = null;
 
 const SESSION_KEY = 'pawpanic_session';
-const MQTT_BROKER = 'wss://broker.emqx.io:8084/mqtt';
+// Singapore / Asia-optimized public broker options
+const MQTT_BROKER = (typeof window !== 'undefined' && window.__MQTT_BROKER__) || 'wss://broker.hivemq.com:8884/mqtt';
 
 export function getSavedSession() {
   try {

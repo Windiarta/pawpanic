@@ -44,11 +44,13 @@ const state = {
   door: null,
   tetherConfig: { active: false, length: 180 }
 };
+if (typeof window !== 'undefined') window.__gameState = state;
 
 let currentScreen = 'menu'; // 'menu' | 'levelSelect' | 'game'
 let isPaused = false;
 let selectedTier = 1;
 let peerSkin = null;
+let lastHostStateSent = 0;
 
 // Timer State
 let levelStartTime = 0;
@@ -1108,10 +1110,15 @@ function sendHostState() {
     p: state.players.map(p => ({
       x: Math.round(p.x * 10) / 10,
       y: Math.round(p.y * 10) / 10,
+      vx: Math.round(p.vx * 10) / 10,
+      vy: Math.round(p.vy * 10) / 10,
       f: p.facing,
       wf: Math.round(p.walkFrame * 10) / 10,
       sw: p.sweating,
-      inD: p.inDoor
+      inD: p.inDoor,
+      hat: p.hat,
+      c: p.color,
+      dc: p.darkColor
     })),
     bl: state.blocks.map(b => ({ x: Math.round(b.x), y: Math.round(b.y), pr: b.pushersRight, pl: b.pushersLeft })),
     bt: state.buttons.map(b => ({ p: b.pressed, t: b.toggled })),
@@ -1135,6 +1142,8 @@ function applyHostState(s) {
     if (!state.players[i]) return;
     state.players[i].targetX = sp.x;
     state.players[i].targetY = sp.y;
+    if (typeof sp.vx === 'number') state.players[i].vx = sp.vx;
+    if (typeof sp.vy === 'number') state.players[i].vy = sp.vy;
     // Don't overwrite local responsive facing/walkFrame on client's own avatar (player 2)
     if (i !== 1) {
       state.players[i].facing = sp.f;
@@ -1142,6 +1151,12 @@ function applyHostState(s) {
     }
     state.players[i].sweating = sp.sw;
     state.players[i].inDoor = sp.inD;
+    // Sync skin colors & hat if received from host state
+    if (sp.c && sp.hat !== undefined) {
+      state.players[i].color = sp.c;
+      if (sp.dc) state.players[i].darkColor = sp.dc;
+      state.players[i].hat = sp.hat;
+    }
     if (Math.hypot(state.players[i].x - sp.x, state.players[i].y - sp.y) > 60) {
       state.players[i].x = sp.x;
       state.players[i].y = sp.y;
@@ -1230,10 +1245,16 @@ initNetwork({
     } else if (data.type === 'skin') {
       peerSkin = data.skin;
       applySkinsToPlayers();
+      // If host receives client's skin, reply with host skin to ensure mutual sync
+      if (getNetMode() === 'host') {
+        networkSend({ type: 'skin', role: 'host', skin: getSkin(1) });
+      }
     }
   },
   onStartGame: (role) => {
-    networkSend({ type: 'skin', role, skin: getSkin() });
+    // Send my current skin to peer
+    const mySkin = role === 'client' ? getSkin(2) : getSkin(1);
+    networkSend({ type: 'skin', role, skin: mySkin });
     if (role === 'host') {
       loadLevel(state.currentLevelIdx, false);
       sendHostState();
@@ -1501,7 +1522,11 @@ function gameLoop() {
       updateParticles();
 
       if (getNetMode() === 'host') {
-        sendHostState();
+        const now = performance.now();
+        if (now - lastHostStateSent >= 33) {
+          sendHostState();
+          lastHostStateSent = now;
+        }
       }
 
       updateTimer();

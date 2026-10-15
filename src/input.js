@@ -99,13 +99,14 @@ export function getPlayerInputs(netMode, remoteInput, sendNetworkInput, isConnec
       jumpPressed: !!justPressed['KeyW'] || !!justPressed['ArrowUp'] || !!justPressed['Space'] || touchState.jumpPressed
     };
 
+    // Client sends input to host immediately on keydown/change or at 30Hz heartbeat
     const now = performance.now();
     const hasChanged = myInput.left !== lastSentInput.left ||
                        myInput.right !== lastSentInput.right ||
                        myInput.jump !== lastSentInput.jump ||
                        myInput.jumpPressed;
 
-    if (isConnected() && (hasChanged || (now - lastInputSentTime > 16))) {
+    if (isConnected() && (hasChanged || (now - lastInputSentTime > 33))) {
       sendNetworkInput(myInput);
       lastSentInput.left = myInput.left;
       lastSentInput.right = myInput.right;

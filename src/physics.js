@@ -53,45 +53,70 @@ export function updatePhysicsEngine({
   const { players, walls, blocks, buttons, movers, tetherConfig, keyItem, door } = state;
 
   if (netMode === 'client') {
-    // 1. Smooth LERP interpolation from host state (no rubberbanding)
-    players.forEach((p) => {
-      if (typeof p.targetX === 'number') {
-        const dist = Math.hypot(p.targetX - p.x, p.targetY - p.y);
-        const factor = dist > 40 ? 0.75 : 0.55;
-        p.x += (p.targetX - p.x) * factor;
-        p.y += (p.targetY - p.y) * factor;
+    // 1. Client-Side Prediction for Player 2 (instant responsive local movement, no delay)
+    const inp = inputs[1];
+    const p2 = players[1];
+    const p1 = players[0];
+
+    // Smoothly interpolate Player 1 (remote host) to targetX/targetY
+    if (p1 && typeof p1.targetX === 'number') {
+      const dist1 = Math.hypot(p1.targetX - p1.x, p1.targetY - p1.y);
+      const factor1 = dist1 > 40 ? 0.85 : 0.65;
+      p1.x += (p1.targetX - p1.x) * factor1;
+      p1.y += (p1.targetY - p1.y) * factor1;
+    }
+
+    // Client-side prediction for Player 2 (Local Player on Guest machine)
+    if (p2 && !p2.inDoor) {
+      if (inp.left && !inp.right) {
+        p2.vx = -MOVE_SPEED;
+        p2.facing = -1;
+        p2.walkFrame += 0.22;
+      } else if (inp.right && !inp.left) {
+        p2.vx = MOVE_SPEED;
+        p2.facing = 1;
+        p2.walkFrame += 0.22;
+      } else {
+        p2.vx *= 0.65;
+        if (Math.abs(p2.vx) < 0.1) p2.vx = 0;
+        p2.walkFrame = 0;
       }
-    });
+
+      if (inp.jumpPressed && p2.onGround) {
+        p2.vy = JUMP_FORCE;
+        p2.onGround = false;
+        spawnDust(p2.x + p2.w / 2, p2.y + p2.h, 8);
+        playSFX('jump');
+      }
+
+      // Soft convergence with host authoritative position
+      if (typeof p2.targetX === 'number') {
+        const errX = p2.targetX - p2.x;
+        const errY = p2.targetY - p2.y;
+        if (Math.abs(errX) > 50) p2.x = p2.targetX;
+        else p2.x += errX * 0.25;
+
+        if (Math.abs(errY) > 50) p2.y = p2.targetY;
+        else p2.y += errY * 0.25;
+      }
+    }
+
+    // Smoothly interpolate objects (blocks, movers, key)
     blocks.forEach(b => {
       if (typeof b.targetX === 'number') {
-        b.x += (b.targetX - b.x) * 0.55;
-        b.y += (b.targetY - b.y) * 0.55;
+        b.x += (b.targetX - b.x) * 0.65;
+        b.y += (b.targetY - b.y) * 0.65;
       }
     });
     movers.forEach(m => {
       if (typeof m.targetX === 'number') {
-        m.x += (m.targetX - m.x) * 0.55;
-        m.y += (m.targetY - m.y) * 0.55;
+        m.x += (m.targetX - m.x) * 0.65;
+        m.y += (m.targetY - m.y) * 0.65;
       }
     });
     if (keyItem && typeof keyItem.targetX === 'number') {
-      keyItem.x += (keyItem.targetX - keyItem.x) * 0.5;
-      keyItem.y += (keyItem.targetY - keyItem.y) * 0.5;
-    }
-
-    // 2. Responsive visual animation for Player 2 without modifying coordinates
-    const inp = inputs[1];
-    const p2 = players[1];
-    if (p2 && !p2.inDoor) {
-      if (inp.left && !inp.right) {
-        p2.facing = -1;
-        p2.walkFrame += 0.25;
-      } else if (inp.right && !inp.left) {
-        p2.facing = 1;
-        p2.walkFrame += 0.25;
-      } else {
-        p2.walkFrame = 0;
-      }
+      keyItem.x += (keyItem.targetX - keyItem.x) * 0.6;
+      keyItem.y += (keyItem.targetY - keyItem.y) * 0.6;
     }
     return;
   }
